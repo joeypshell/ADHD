@@ -76,89 +76,30 @@
           </section>
         </section>
 
-        <section class="view" id="captureView" data-view-panel="capture" aria-labelledby="captureTitle">
+        <section class="view" id="wizardView" data-view-panel="wizard" aria-labelledby="wizardTitle">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Make it real</p>
-              <h2 id="captureTitle">New item</h2>
+              <p class="eyebrow">Guided setup</p>
+              <h2 id="wizardTitle">Wizard</h2>
             </div>
+            <button class="secondary-button" id="resetWizardButton" type="button">Reset</button>
           </div>
-          <form class="item-form" id="itemForm">
-            <label class="span-full">
-              Title
-              <input id="itemTitle" required autocomplete="off" placeholder="What is the thing?">
-            </label>
-            <label>
-              Area
-              <select id="itemArea"></select>
-            </label>
-            <label>
-              Status
-              <select id="itemStatus"></select>
-            </label>
-            <label>
-              Due
-              <input id="itemDue" type="date">
-            </label>
-            <label>
-              Review
-              <input id="itemReview" type="date">
-            </label>
-            <label>
-              Importance
-              <select id="itemImportance">
-                <option value="1">1 low</option>
-                <option value="2">2</option>
-                <option value="3" selected>3 medium</option>
-                <option value="4">4</option>
-                <option value="5">5 high</option>
-              </select>
-            </label>
-            <label>
-              Dread
-              <select id="itemDread">
-                <option value="1">1 easy</option>
-                <option value="2">2</option>
-                <option value="3" selected>3 medium</option>
-                <option value="4">4</option>
-                <option value="5">5 scary</option>
-              </select>
-            </label>
-            <label>
-              Time
-              <select id="itemEstimate">
-                <option value="5">5 min</option>
-                <option value="10" selected>10 min</option>
-                <option value="15">15 min</option>
-                <option value="30">30 min</option>
-                <option value="60">60 min</option>
-              </select>
-            </label>
-            <label>
-              Waiting for
-              <input id="itemWaitingFor" autocomplete="off" placeholder="Person, office, reply">
-            </label>
-            <label class="span-full">
-              Tiny start
-              <input id="itemNextAction" autocomplete="off" placeholder="Open the portal for 5 minutes">
-            </label>
-            <label class="span-full">
-              Why it matters
-              <input id="itemConsequence" autocomplete="off" placeholder="Due soon, blocks something, avoids a fee">
-            </label>
-            <label class="span-full">
-              First steps
-              <textarea id="itemSteps" rows="4" placeholder="One step per line"></textarea>
-            </label>
-            <label class="span-full">
-              Notes
-              <textarea id="itemNotes" rows="3"></textarea>
-            </label>
-            <div class="form-actions span-full">
-              <button type="button" class="secondary-button" id="clearItemFormButton">Clear</button>
-              <button type="submit" class="primary-button">Create item</button>
+          <section class="wizard-card" aria-live="polite">
+            <div class="wizard-progress">
+              <div>
+                <p class="eyebrow" id="wizardModeLabel">Add a thing</p>
+                <h3 id="wizardStepTitle">Choose a path</h3>
+              </div>
+              <span id="wizardStepCount">1/1</span>
             </div>
-          </form>
+            <div class="progress-line wizard-line" aria-hidden="true"><span id="wizardProgressBar"></span></div>
+            <div id="wizardBody"></div>
+            <div class="wizard-controls">
+              <button class="secondary-button" id="wizardBackButton" type="button">Back</button>
+              <button class="ghost-button" id="wizardSkipButton" type="button">I don't know</button>
+              <button class="primary-button" id="wizardNextButton" type="button">Next</button>
+            </div>
+          </section>
         </section>
 
         <section class="view" id="projectsView" data-view-panel="projects" aria-labelledby="projectsTitle">
@@ -215,7 +156,7 @@
 
       <nav class="bottom-nav" aria-label="Views">
         <button class="nav-button is-active" type="button" data-view="now">Now</button>
-        <button class="nav-button" type="button" data-view="capture">Capture</button>
+        <button class="nav-button" type="button" data-view="wizard">Wizard</button>
         <button class="nav-button" type="button" data-view="projects">Projects</button>
         <button class="nav-button" type="button" data-view="map">Map</button>
         <button class="nav-button" type="button" data-view="review">Review</button>

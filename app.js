@@ -59,8 +59,63 @@ const DEFAULT_DATA = {
   ]
 };
 
+const WIZARD_MODES = {
+  thing: {
+    label: "Add a thing",
+    description: "For one obligation, errand, admin task, or work item.",
+    steps: ["mode", "title", "area", "timing", "consequence", "waiting", "tiny", "summary"],
+    defaults: { status: "inbox", importance: 3, dread: 3, estimate: 10 }
+  },
+  project: {
+    label: "Break down a project",
+    description: "For something with multiple steps or an unclear finish line.",
+    steps: ["mode", "title", "area", "done", "steps", "timing", "consequence", "tiny", "summary"],
+    defaults: { status: "active", importance: 3, dread: 3, estimate: 15 }
+  },
+  rescue: {
+    label: "Rescue something scary",
+    description: "For something late, avoided, embarrassing, or consequence-heavy.",
+    steps: ["mode", "title", "fear", "timing", "consequence", "tiny", "steps", "summary"],
+    defaults: { status: "red", importance: 5, dread: 5, estimate: 10 }
+  }
+};
+
+const CONSEQUENCE_OPTIONS = [
+  "Due soon",
+  "Blocks something important",
+  "Someone is waiting",
+  "Money or fee risk",
+  "Medical/admin",
+  "Work visibility",
+  "Embarrassing if ignored"
+];
+
+const STEP_SUGGESTIONS = {
+  thing: [
+    "Open the place where this lives for 5 minutes",
+    "Find the next missing piece",
+    "Do or send one small piece",
+    "Update this item"
+  ],
+  project: [
+    "Define what done looks like",
+    "List the known pieces",
+    "Find the next missing piece",
+    "Do the first visible step",
+    "Update this project"
+  ],
+  rescue: [
+    "Open the scary thing for 5 minutes",
+    "Name the real consequence",
+    "Draft the smallest recovery message",
+    "Send or schedule one recovery action",
+    "Set the next checkback"
+  ]
+};
+
 let state = loadState();
 let stuckItemId = "";
+let wizard = createWizardState("thing");
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -79,21 +134,15 @@ const els = {
   activeCount: document.querySelector("#activeCount"),
   nextQueueList: document.querySelector("#nextQueueList"),
   redZoneList: document.querySelector("#redZoneList"),
-  itemForm: document.querySelector("#itemForm"),
-  clearItemFormButton: document.querySelector("#clearItemFormButton"),
-  itemTitle: document.querySelector("#itemTitle"),
-  itemArea: document.querySelector("#itemArea"),
-  itemStatus: document.querySelector("#itemStatus"),
-  itemDue: document.querySelector("#itemDue"),
-  itemReview: document.querySelector("#itemReview"),
-  itemImportance: document.querySelector("#itemImportance"),
-  itemDread: document.querySelector("#itemDread"),
-  itemEstimate: document.querySelector("#itemEstimate"),
-  itemWaitingFor: document.querySelector("#itemWaitingFor"),
-  itemNextAction: document.querySelector("#itemNextAction"),
-  itemConsequence: document.querySelector("#itemConsequence"),
-  itemSteps: document.querySelector("#itemSteps"),
-  itemNotes: document.querySelector("#itemNotes"),
+  resetWizardButton: document.querySelector("#resetWizardButton"),
+  wizardModeLabel: document.querySelector("#wizardModeLabel"),
+  wizardStepTitle: document.querySelector("#wizardStepTitle"),
+  wizardStepCount: document.querySelector("#wizardStepCount"),
+  wizardProgressBar: document.querySelector("#wizardProgressBar"),
+  wizardBody: document.querySelector("#wizardBody"),
+  wizardBackButton: document.querySelector("#wizardBackButton"),
+  wizardSkipButton: document.querySelector("#wizardSkipButton"),
+  wizardNextButton: document.querySelector("#wizardNextButton"),
   projectList: document.querySelector("#projectList"),
   areaFilter: document.querySelector("#areaFilter"),
   statusFilters: document.querySelector("#statusFilters"),
@@ -146,6 +195,12 @@ function cloneData(value) {
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function dateOffset(days) {
+  const date = new Date(`${todayIso()}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function tomorrowAt(hour) {
@@ -334,6 +389,499 @@ function normalizeSteps(steps, nextAction) {
   const parsed = fromLines.map((line) => String(line).trim()).filter(Boolean);
   if (!parsed.length && nextAction) parsed.push(nextAction);
   return parsed.map((text) => ({ id: cryptoId(), text, done: false }));
+}
+
+function createWizardState(mode) {
+  const safeMode = WIZARD_MODES[mode] ? mode : "thing";
+  const meta = WIZARD_MODES[safeMode];
+  return {
+    mode: safeMode,
+    stepIndex: 0,
+    data: {
+      title: "",
+      area: "Unsorted",
+      status: meta.defaults.status,
+      due: "",
+      review: "",
+      consequenceTags: [],
+      customConsequence: "",
+      fear: "",
+      done: "",
+      waitingFor: "",
+      nextAction: "",
+      steps: [],
+      notes: "",
+      importance: meta.defaults.importance,
+      dread: meta.defaults.dread,
+      estimate: meta.defaults.estimate
+    }
+  };
+}
+
+function currentWizardSteps() {
+  return WIZARD_MODES[wizard.mode].steps;
+}
+
+function currentWizardStep() {
+  return currentWizardSteps()[wizard.stepIndex];
+}
+
+function resetWizard(mode = "thing") {
+  wizard = createWizardState(mode);
+  renderWizard();
+}
+
+function wizardStepTitle(step) {
+  const titles = {
+    mode: "Choose a path",
+    title: "Name the thing",
+    area: "Where does it belong?",
+    timing: "When does it matter?",
+    consequence: "Why does it matter?",
+    waiting: "Is someone else involved?",
+    tiny: "Find the tiny start",
+    steps: "Add small steps",
+    done: "What does done look like?",
+    fear: "What makes it scary?",
+    summary: "Create the item"
+  };
+  return titles[step] || "Wizard";
+}
+
+function renderWizard() {
+  if (!els.wizardBody) return;
+  const steps = currentWizardSteps();
+  const step = currentWizardStep();
+  const progress = Math.round(((wizard.stepIndex + 1) / steps.length) * 100);
+
+  els.wizardModeLabel.textContent = WIZARD_MODES[wizard.mode].label;
+  els.wizardStepTitle.textContent = wizardStepTitle(step);
+  els.wizardStepCount.textContent = `${wizard.stepIndex + 1}/${steps.length}`;
+  els.wizardProgressBar.style.width = `${progress}%`;
+  els.wizardBackButton.disabled = wizard.stepIndex === 0;
+  els.wizardSkipButton.hidden = step === "mode" || step === "summary";
+  els.wizardNextButton.textContent = step === "summary" ? "Create item" : "Next";
+
+  els.wizardBody.replaceChildren(renderWizardStep(step));
+}
+
+function renderWizardStep(step) {
+  if (step === "mode") return renderWizardMode();
+  if (step === "title") return renderWizardText({
+    key: "title",
+    prompt: "What should this be called?",
+    placeholder: "Example: renew car sticker"
+  });
+  if (step === "area") return renderWizardArea();
+  if (step === "timing") return renderWizardTiming();
+  if (step === "consequence") return renderWizardConsequence();
+  if (step === "waiting") return renderWizardWaiting();
+  if (step === "tiny") return renderWizardTiny();
+  if (step === "steps") return renderWizardSteps();
+  if (step === "done") return renderWizardText({
+    key: "done",
+    prompt: "What would count as done enough?",
+    placeholder: "Example: submitted, paid, emailed, drafted, scheduled",
+    multiline: true
+  });
+  if (step === "fear") return renderWizardFear();
+  if (step === "summary") return renderWizardSummary();
+  return makeEmpty("Unknown wizard step");
+}
+
+function wizardPanel(prompt) {
+  const panel = document.createElement("div");
+  panel.className = "wizard-step";
+  const copy = document.createElement("p");
+  copy.className = "wizard-prompt";
+  copy.textContent = prompt;
+  panel.append(copy);
+  return panel;
+}
+
+function renderWizardMode() {
+  const panel = wizardPanel("What kind of setup do you need?");
+  const grid = document.createElement("div");
+  grid.className = "wizard-option-grid";
+
+  Object.entries(WIZARD_MODES).forEach(([mode, meta]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `wizard-option${wizard.mode === mode ? " is-selected" : ""}`;
+    const title = document.createElement("strong");
+    title.textContent = meta.label;
+    const description = document.createElement("span");
+    description.textContent = meta.description;
+    button.append(title, description);
+    button.addEventListener("click", () => {
+      wizard = createWizardState(mode);
+      wizard.stepIndex = 1;
+      renderWizard();
+    });
+    grid.append(button);
+  });
+
+  panel.append(grid);
+  return panel;
+}
+
+function renderWizardText({ key, prompt, placeholder, multiline = false }) {
+  const panel = wizardPanel(prompt);
+  const label = document.createElement("label");
+  label.className = "wizard-field";
+  label.textContent = "Answer";
+  const field = multiline ? document.createElement("textarea") : document.createElement("input");
+  if (multiline) field.rows = 4;
+  field.value = wizard.data[key] || "";
+  field.placeholder = placeholder;
+  field.addEventListener("input", () => {
+    wizard.data[key] = field.value;
+  });
+  label.append(field);
+  panel.append(label);
+  return panel;
+}
+
+function renderWizardArea() {
+  const panel = wizardPanel("Pick the closest bucket. This is only for sorting; it can change later.");
+  const grid = document.createElement("div");
+  grid.className = "wizard-chip-grid";
+  AREAS.forEach((area) => {
+    grid.append(makeWizardChoice(area, wizard.data.area === area, () => {
+      wizard.data.area = area;
+      renderWizard();
+    }));
+  });
+  panel.append(grid);
+  return panel;
+}
+
+function renderWizardTiming() {
+  const panel = wizardPanel("Choose a due date if there is one. If not, choose when this should resurface.");
+  const dueChoices = [
+    { label: "Today", value: todayIso() },
+    { label: "Tomorrow", value: dateOffset(1) },
+    { label: "This week", value: dateOffset(7) },
+    { label: "No due date", value: "" }
+  ];
+  const reviewChoices = [
+    { label: "Review tomorrow", value: dateOffset(1) },
+    { label: "Review in 3 days", value: dateOffset(3) },
+    { label: "Review next week", value: dateOffset(7) },
+    { label: "No review", value: "" }
+  ];
+
+  panel.append(makeChoiceGroup("Due", dueChoices, wizard.data.due, (value) => {
+    wizard.data.due = value;
+    if (value && !wizard.data.review) wizard.data.review = value;
+    renderWizard();
+  }));
+
+  const dueLabel = document.createElement("label");
+  dueLabel.className = "wizard-field";
+  dueLabel.textContent = "Custom due date";
+  const dueInput = document.createElement("input");
+  dueInput.type = "date";
+  dueInput.value = wizard.data.due;
+  dueInput.addEventListener("input", () => {
+    wizard.data.due = dueInput.value;
+  });
+  dueLabel.append(dueInput);
+  panel.append(dueLabel);
+
+  panel.append(makeChoiceGroup("Review", reviewChoices, wizard.data.review, (value) => {
+    wizard.data.review = value;
+    renderWizard();
+  }));
+  return panel;
+}
+
+function renderWizardConsequence() {
+  const panel = wizardPanel("Tap anything that explains why this should not disappear.");
+  const grid = document.createElement("div");
+  grid.className = "wizard-chip-grid";
+  CONSEQUENCE_OPTIONS.forEach((option) => {
+    grid.append(makeWizardChoice(option, wizard.data.consequenceTags.includes(option), () => {
+      toggleArrayValue(wizard.data.consequenceTags, option);
+      if (option === "Someone is waiting") {
+        const isWaiting = wizard.data.consequenceTags.includes(option);
+        wizard.data.status = isWaiting ? "waiting" : WIZARD_MODES[wizard.mode].defaults.status;
+      }
+      renderWizard();
+    }));
+  });
+  panel.append(grid);
+
+  const label = document.createElement("label");
+  label.className = "wizard-field";
+  label.textContent = "Custom why";
+  const input = document.createElement("input");
+  input.value = wizard.data.customConsequence;
+  input.placeholder = "Example: needed before doctor appointment";
+  input.addEventListener("input", () => {
+    wizard.data.customConsequence = input.value;
+  });
+  label.append(input);
+  panel.append(label);
+  return panel;
+}
+
+function renderWizardWaiting() {
+  const panel = wizardPanel("If this depends on another person, office, reply, delivery, or portal, put that here.");
+  const row = document.createElement("div");
+  row.className = "wizard-chip-grid";
+  row.append(
+    makeWizardChoice("Nobody", !wizard.data.waitingFor && wizard.data.status !== "waiting", () => {
+      wizard.data.waitingFor = "";
+      if (wizard.data.status === "waiting") wizard.data.status = WIZARD_MODES[wizard.mode].defaults.status;
+      renderWizard();
+    }),
+    makeWizardChoice("Waiting on someone", wizard.data.status === "waiting", () => {
+      wizard.data.status = "waiting";
+      wizard.data.review = wizard.data.review || dateOffset(2);
+      renderWizard();
+    })
+  );
+  panel.append(row);
+
+  const label = document.createElement("label");
+  label.className = "wizard-field";
+  label.textContent = "Waiting for";
+  const input = document.createElement("input");
+  input.value = wizard.data.waitingFor;
+  input.placeholder = "Person, clinic, reply, office, delivery";
+  input.addEventListener("input", () => {
+    wizard.data.waitingFor = input.value;
+    if (input.value.trim()) wizard.data.status = "waiting";
+  });
+  label.append(input);
+  panel.append(label);
+  return panel;
+}
+
+function renderWizardTiny() {
+  const panel = wizardPanel("Choose the first physical action small enough to start while tired.");
+  const suggestions = STEP_SUGGESTIONS[wizard.mode] || STEP_SUGGESTIONS.thing;
+  const grid = document.createElement("div");
+  grid.className = "wizard-option-grid";
+  suggestions.forEach((step) => {
+    grid.append(makeWizardChoice(step, wizard.data.nextAction === step, () => {
+      wizard.data.nextAction = step;
+      if (!wizard.data.steps.length) wizard.data.steps = [step];
+      renderWizard();
+    }, "wizard-option compact"));
+  });
+  panel.append(grid);
+
+  const label = document.createElement("label");
+  label.className = "wizard-field";
+  label.textContent = "Custom tiny start";
+  const input = document.createElement("input");
+  input.value = wizard.data.nextAction;
+  input.placeholder = "Example: open the DMV site";
+  input.addEventListener("input", () => {
+    wizard.data.nextAction = input.value;
+  });
+  label.append(input);
+  panel.append(label);
+  return panel;
+}
+
+function renderWizardSteps() {
+  const panel = wizardPanel("Add a few visible steps. They can be rough and incomplete.");
+  const suggestions = STEP_SUGGESTIONS[wizard.mode] || STEP_SUGGESTIONS.thing;
+  const grid = document.createElement("div");
+  grid.className = "wizard-chip-grid";
+  suggestions.forEach((step) => {
+    grid.append(makeWizardChoice(step, wizard.data.steps.includes(step), () => {
+      toggleArrayValue(wizard.data.steps, step);
+      if (!wizard.data.nextAction && wizard.data.steps.length) wizard.data.nextAction = wizard.data.steps[0];
+      renderWizard();
+    }));
+  });
+  panel.append(grid);
+
+  const label = document.createElement("label");
+  label.className = "wizard-field";
+  label.textContent = "Custom steps";
+  const textarea = document.createElement("textarea");
+  textarea.rows = 5;
+  textarea.placeholder = "One step per line";
+  textarea.value = wizard.data.steps.join("\n");
+  textarea.addEventListener("input", () => {
+    wizard.data.steps = textarea.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  });
+  label.append(textarea);
+  panel.append(label);
+  return panel;
+}
+
+function renderWizardFear() {
+  const panel = wizardPanel("Name the scary part. This turns dread into data.");
+  const grid = document.createElement("div");
+  grid.className = "wizard-chip-grid";
+  ["It is late", "I might disappoint someone", "It could cost money", "I do not know the steps", "I need to send a message"].forEach((fear) => {
+    grid.append(makeWizardChoice(fear, wizard.data.fear.includes(fear), () => {
+      wizard.data.fear = wizard.data.fear === fear ? "" : fear;
+      renderWizard();
+    }));
+  });
+  panel.append(grid);
+
+  const label = document.createElement("label");
+  label.className = "wizard-field";
+  label.textContent = "Custom scary part";
+  const textarea = document.createElement("textarea");
+  textarea.rows = 3;
+  textarea.value = wizard.data.fear;
+  textarea.placeholder = "What are you afraid will happen?";
+  textarea.addEventListener("input", () => {
+    wizard.data.fear = textarea.value;
+  });
+  label.append(textarea);
+  panel.append(label);
+  return panel;
+}
+
+function renderWizardSummary() {
+  const item = buildWizardItem();
+  const panel = wizardPanel("This is what will be created. You can edit it later.");
+  const card = document.createElement("article");
+  card.className = `wizard-summary status-${item.status}`;
+
+  const title = document.createElement("h3");
+  title.textContent = item.title;
+  const meta = document.createElement("p");
+  meta.className = "item-meta";
+  meta.textContent = [
+    item.area,
+    statusLabel(item.status),
+    item.due ? `Due ${formatDate(item.due)}` : "",
+    item.review ? `Review ${formatDate(item.review)}` : ""
+  ].filter(Boolean).join(" / ");
+
+  const tiny = document.createElement("div");
+  tiny.className = "tiny-start";
+  const tinyLabel = document.createElement("span");
+  tinyLabel.textContent = "Tiny start";
+  const tinyText = document.createElement("strong");
+  tinyText.textContent = item.nextAction || firstOpenStep(item.steps) || "Open this for 5 minutes";
+  tiny.append(tinyLabel, tinyText);
+
+  const steps = document.createElement("ul");
+  steps.className = "wizard-summary-steps";
+  normalizeSteps(item.steps, item.nextAction).slice(0, 6).forEach((step) => {
+    const li = document.createElement("li");
+    li.textContent = step.text;
+    steps.append(li);
+  });
+
+  card.append(meta, title, tiny, steps);
+  panel.append(card);
+  return panel;
+}
+
+function makeChoiceGroup(labelText, choices, selected, onChoose) {
+  const wrap = document.createElement("div");
+  wrap.className = "wizard-choice-group";
+  const label = document.createElement("p");
+  label.className = "choice-label";
+  label.textContent = labelText;
+  const grid = document.createElement("div");
+  grid.className = "wizard-chip-grid";
+  choices.forEach((choice) => {
+    grid.append(makeWizardChoice(choice.label, selected === choice.value, () => onChoose(choice.value)));
+  });
+  wrap.append(label, grid);
+  return wrap;
+}
+
+function makeWizardChoice(label, selected, onClick, className = "wizard-chip") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `${className}${selected ? " is-selected" : ""}`;
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function toggleArrayValue(array, value) {
+  const index = array.indexOf(value);
+  if (index >= 0) array.splice(index, 1);
+  else array.push(value);
+}
+
+function wizardNext() {
+  const step = currentWizardStep();
+  applyWizardDefault(step);
+  if (step === "summary") {
+    addItem(buildWizardItem());
+    resetWizard(wizard.mode);
+    showView("now");
+    return;
+  }
+  wizard.stepIndex = Math.min(wizard.stepIndex + 1, currentWizardSteps().length - 1);
+  renderWizard();
+}
+
+function wizardBack() {
+  wizard.stepIndex = Math.max(0, wizard.stepIndex - 1);
+  renderWizard();
+}
+
+function wizardSkip() {
+  applyWizardDefault(currentWizardStep(), true);
+  wizard.stepIndex = Math.min(wizard.stepIndex + 1, currentWizardSteps().length - 1);
+  renderWizard();
+}
+
+function applyWizardDefault(step, skipped = false) {
+  if (step === "title" && !wizard.data.title.trim()) {
+    wizard.data.title = wizard.mode === "rescue" ? "Scary thing to rescue" : "New item";
+  }
+  if (step === "tiny" && !wizard.data.nextAction.trim()) {
+    wizard.data.nextAction = STEP_SUGGESTIONS[wizard.mode][0];
+  }
+  if (step === "steps" && !wizard.data.steps.length) {
+    wizard.data.steps = STEP_SUGGESTIONS[wizard.mode].slice(0, wizard.mode === "thing" ? 3 : 5);
+  }
+  if (step === "waiting" && skipped && wizard.data.status === "waiting" && !wizard.data.waitingFor.trim()) {
+    wizard.data.status = WIZARD_MODES[wizard.mode].defaults.status;
+  }
+}
+
+function buildWizardItem() {
+  const defaults = WIZARD_MODES[wizard.mode].defaults;
+  const consequenceParts = [
+    ...wizard.data.consequenceTags,
+    wizard.data.customConsequence.trim()
+  ].filter(Boolean);
+  const notes = [];
+  if (wizard.data.done.trim()) notes.push(`Done enough: ${wizard.data.done.trim()}`);
+  if (wizard.data.fear.trim()) notes.push(`Scary part: ${wizard.data.fear.trim()}`);
+  if (wizard.data.notes.trim()) notes.push(wizard.data.notes.trim());
+
+  const nextAction = wizard.data.nextAction.trim() || STEP_SUGGESTIONS[wizard.mode][0];
+  const steps = wizard.data.steps.length ? wizard.data.steps : [nextAction];
+  let status = wizard.data.status || defaults.status;
+  if (wizard.data.waitingFor.trim()) status = "waiting";
+  if (wizard.mode === "rescue") status = "red";
+
+  return {
+    title: wizard.data.title.trim() || "New item",
+    area: wizard.data.area || "Unsorted",
+    status,
+    due: wizard.data.due,
+    review: wizard.data.review || (status === "waiting" ? dateOffset(2) : ""),
+    consequence: consequenceParts.join(", "),
+    nextAction,
+    importance: wizard.data.importance || defaults.importance,
+    dread: wizard.data.dread || defaults.dread,
+    estimate: wizard.data.estimate || defaults.estimate,
+    waitingFor: wizard.data.waitingFor.trim(),
+    notes: notes.join("\n"),
+    steps
+  };
 }
 
 function updateStep(itemId, stepId, patch) {
@@ -549,7 +1097,7 @@ function renderRecommendation() {
     copy.textContent = "No active item is asking for attention.";
     const actions = document.createElement("div");
     actions.className = "now-actions";
-    actions.append(createButton("Capture", "primary-button", () => showView("capture")));
+    actions.append(createButton("Wizard", "primary-button", () => showView("wizard")));
     panel.append(title, copy, actions);
     els.recommendationPanel.append(panel);
     return;
@@ -918,46 +1466,11 @@ function populateSelect(select, options, selected) {
 }
 
 function populateFormSelects() {
-  populateSelect(els.itemArea, AREAS, "Unsorted");
-  populateSelect(els.itemStatus, STATUSES, "inbox");
   populateSelect(els.editArea, AREAS, "Unsorted");
   populateSelect(els.editStatus, STATUSES, "inbox");
   populateSelect(els.editImportance, [1, 2, 3, 4, 5].map((n) => ({ id: String(n), label: String(n) })), "3");
   populateSelect(els.editDread, [1, 2, 3, 4, 5].map((n) => ({ id: String(n), label: String(n) })), "3");
   populateSelect(els.editEstimate, ESTIMATES.map((n) => ({ id: String(n), label: `${n} min` })), "10");
-}
-
-function clearItemForm() {
-  els.itemForm.reset();
-  els.itemArea.value = "Unsorted";
-  els.itemStatus.value = "inbox";
-  els.itemImportance.value = "3";
-  els.itemDread.value = "3";
-  els.itemEstimate.value = "10";
-}
-
-function createItemFromForm(event) {
-  event.preventDefault();
-  const title = els.itemTitle.value.trim();
-  if (!title) return;
-
-  addItem({
-    title,
-    area: els.itemArea.value,
-    status: els.itemStatus.value,
-    due: els.itemDue.value,
-    review: els.itemReview.value,
-    importance: Number(els.itemImportance.value),
-    dread: Number(els.itemDread.value),
-    estimate: Number(els.itemEstimate.value),
-    waitingFor: els.itemWaitingFor.value.trim(),
-    nextAction: els.itemNextAction.value.trim(),
-    consequence: els.itemConsequence.value.trim(),
-    steps: els.itemSteps.value,
-    notes: els.itemNotes.value.trim()
-  });
-  clearItemForm();
-  showView("now");
 }
 
 function quickCapture(event) {
@@ -1155,8 +1668,10 @@ function bindEvents() {
   }).format(new Date());
 
   els.quickCaptureForm.addEventListener("submit", quickCapture);
-  els.itemForm.addEventListener("submit", createItemFromForm);
-  els.clearItemFormButton.addEventListener("click", clearItemForm);
+  els.resetWizardButton.addEventListener("click", () => resetWizard(wizard.mode));
+  els.wizardBackButton.addEventListener("click", wizardBack);
+  els.wizardSkipButton.addEventListener("click", wizardSkip);
+  els.wizardNextButton.addEventListener("click", wizardNext);
   els.refreshNowButton.addEventListener("click", render);
 
   els.navButtons.forEach((button) => {
@@ -1229,6 +1744,7 @@ function bindEvents() {
 
 function render() {
   renderStats();
+  renderWizard();
   renderRecommendation();
   renderRedZone();
   renderAreaFilter();
