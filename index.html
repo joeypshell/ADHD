@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#24443f">
+    <title>Life Command Center</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="todayLabel">Today</p>
+          <h1>Life Command Center</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="exportButton" type="button" aria-label="Export snapshot" title="Export snapshot">
+            <span aria-hidden="true">DL</span>
+          </button>
+          <button class="icon-button" id="importButton" type="button" aria-label="Import snapshot" title="Import snapshot">
+            <span aria-hidden="true">UP</span>
+          </button>
+          <input id="importFile" type="file" accept="application/json" hidden>
+        </div>
+      </header>
+
+      <main>
+        <section class="capture-band" aria-labelledby="captureTitle">
+          <div>
+            <h2 id="captureTitle">Capture</h2>
+          </div>
+          <form class="capture-form" id="captureForm">
+            <label class="sr-only" for="captureInput">New item</label>
+            <input id="captureInput" autocomplete="off" placeholder="Dump the thing here" required>
+            <button type="submit">Add</button>
+          </form>
+        </section>
+
+        <section class="stats-strip" aria-label="Board totals">
+          <button class="stat-pill" type="button" data-filter-status="red">
+            <span id="redCount">0</span>
+            <span>Red</span>
+          </button>
+          <button class="stat-pill" type="button" data-filter-status="now">
+            <span id="nowCount">0</span>
+            <span>Now</span>
+          </button>
+          <button class="stat-pill" type="button" data-filter-status="waiting">
+            <span id="waitingCount">0</span>
+            <span>Waiting</span>
+          </button>
+          <button class="stat-pill" type="button" data-filter-status="inbox">
+            <span id="inboxCount">0</span>
+            <span>Inbox</span>
+          </button>
+        </section>
+
+        <nav class="view-tabs" aria-label="Views">
+          <button class="tab-button is-active" type="button" data-view="launch">Launch</button>
+          <button class="tab-button" type="button" data-view="board">Board</button>
+          <button class="tab-button" type="button" data-view="map">Map</button>
+          <button class="tab-button" type="button" data-view="rhythm">Rhythm</button>
+        </nav>
+
+        <section class="view is-active" id="launchView" data-view-panel="launch" aria-labelledby="launchTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Start here</p>
+              <h2 id="launchTitle">Today / Now</h2>
+            </div>
+            <button class="secondary-button" id="buildNowButton" type="button">Pick 3</button>
+          </div>
+          <div class="now-list" id="nowList"></div>
+          <div class="launch-grid">
+            <section class="panel" aria-labelledby="redTitle">
+              <div class="panel-heading">
+                <h3 id="redTitle">Red Zone</h3>
+                <span class="count-badge" id="redPanelCount">0</span>
+              </div>
+              <div id="redList"></div>
+            </section>
+            <section class="panel" aria-labelledby="inboxTitle">
+              <div class="panel-heading">
+                <h3 id="inboxTitle">Inbox</h3>
+                <span class="count-badge" id="inboxPanelCount">0</span>
+              </div>
+              <div id="inboxList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="boardView" data-view-panel="board" aria-labelledby="boardTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">One place</p>
+              <h2 id="boardTitle">Board</h2>
+            </div>
+            <select id="areaFilter" aria-label="Filter area">
+              <option value="all">All areas</option>
+            </select>
+          </div>
+          <div class="board-columns" id="boardColumns"></div>
+        </section>
+
+        <section class="view" id="mapView" data-view-panel="map" aria-labelledby="mapTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Shape of things</p>
+              <h2 id="mapTitle">Mind Map</h2>
+            </div>
+            <button class="secondary-button" id="clearFilterButton" type="button">All</button>
+          </div>
+          <div class="map-wrap">
+            <svg id="mindMap" role="img" aria-label="Mind map of active life areas" viewBox="0 0 1100 760"></svg>
+          </div>
+          <div class="map-focus" id="mapFocus"></div>
+        </section>
+
+        <section class="view" id="rhythmView" data-view-panel="rhythm" aria-labelledby="rhythmTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Repeatable</p>
+              <h2 id="rhythmTitle">Rhythm</h2>
+            </div>
+            <button class="secondary-button" id="addRecurringButton" type="button">Add</button>
+          </div>
+          <div class="recurring-list" id="recurringList"></div>
+        </section>
+      </main>
+    </div>
+
+    <template id="itemTemplate">
+      <article class="item-card">
+        <div class="item-card-top">
+          <div>
+            <p class="item-meta"></p>
+            <h3 class="item-title"></h3>
+          </div>
+          <button class="icon-button small more-button" type="button" aria-label="Edit item" title="Edit item">...</button>
+        </div>
+        <div class="progress-line" aria-hidden="true">
+          <span></span>
+        </div>
+        <ul class="step-list"></ul>
+        <form class="step-form">
+          <label class="sr-only">Add step</label>
+          <input autocomplete="off" placeholder="Next tiny step">
+          <button type="submit">+</button>
+        </form>
+        <div class="item-actions" aria-label="Item actions"></div>
+        <details class="item-editor">
+          <summary>Edit</summary>
+          <div class="editor-grid">
+            <label>
+              Title
+              <input class="edit-title">
+            </label>
+            <label>
+              Area
+              <select class="edit-area"></select>
+            </label>
+            <label>
+              Status
+              <select class="edit-status"></select>
+            </label>
+            <label>
+              Due
+              <input class="edit-due" type="date">
+            </label>
+            <label>
+              Review
+              <input class="edit-review" type="date">
+            </label>
+            <label>
+              Waiting for
+              <input class="edit-waiting">
+            </label>
+            <label class="span-full">
+              Consequence
+              <input class="edit-consequence">
+            </label>
+            <label class="span-full">
+              Notes
+              <textarea class="edit-notes" rows="3"></textarea>
+            </label>
+          </div>
+          <div class="editor-actions">
+            <button class="danger-button delete-button" type="button">Delete</button>
+          </div>
+        </details>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

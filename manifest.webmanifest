@@ -1,0 +1,15 @@
+{
+  "name": "Life Command Center",
+  "short_name": "Command Center",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8faf6",
+  "theme_color": "#24443f",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
