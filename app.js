@@ -207,12 +207,13 @@ const STARTER_RHYTHM_TITLES = new Set([
 ]);
 
 const DEFAULT_DATA = {
-  version: 4,
+  version: 5,
   createdAt: new Date().toISOString(),
   lastReviewed: "",
   mode: "home",
   filter: { area: "all", status: "" },
   todayPlan: createDailyPlan(),
+  focusSession: null,
   items: DEFAULT_RHYTHMS.map((rhythm) => createRhythmItem(rhythm)),
   recurring: []
 };
@@ -275,6 +276,7 @@ let state = loadState();
 let stuckItemId = "";
 let wizard = createWizardState("project");
 let emptyWizardAutoOpened = false;
+let focusTimerId = 0;
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -354,6 +356,19 @@ const els = {
   detailTitle: document.querySelector("#detailTitle"),
   detailBody: document.querySelector("#detailBody"),
   closeDetailButton: document.querySelector("#closeDetailButton"),
+  focusDialog: document.querySelector("#focusDialog"),
+  focusMeta: document.querySelector("#focusMeta"),
+  focusTitle: document.querySelector("#focusTitle"),
+  focusStateLabel: document.querySelector("#focusStateLabel"),
+  focusTime: document.querySelector("#focusTime"),
+  focusProgressBar: document.querySelector("#focusProgressBar"),
+  focusStep: document.querySelector("#focusStep"),
+  focusDoneButton: document.querySelector("#focusDoneButton"),
+  focusPauseButton: document.querySelector("#focusPauseButton"),
+  focusAddFiveButton: document.querySelector("#focusAddFiveButton"),
+  focusSnoozeButton: document.querySelector("#focusSnoozeButton"),
+  focusNotifyButton: document.querySelector("#focusNotifyButton"),
+  closeFocusButton: document.querySelector("#closeFocusButton"),
   planDialog: document.querySelector("#planDialog"),
   planModeLabel: document.querySelector("#planModeLabel"),
   planList: document.querySelector("#planList"),
@@ -649,15 +664,20 @@ function normalizeData(data) {
   const normalized = {
     ...cloneData(DEFAULT_DATA),
     ...data,
-    version: 4,
+    version: 5,
     mode: DASHBOARD_MODES.some((mode) => mode.id === data.mode) ? data.mode : "home",
     filter: { area: "all", status: "", kind: "", ...(data.filter || {}) },
     todayPlan: normalizeDailyPlan(data.todayPlan),
+    focusSession: normalizeFocusSession(data.focusSession),
     items: [...sourceItems, ...migratedRhythms],
     recurring: []
   };
 
   normalized.items = normalized.items.map(normalizeItem);
+  if (normalized.focusSession) {
+    const focusItem = normalized.items.find((item) => item.id === normalized.focusSession.itemId);
+    if (!focusItem || !isOpen(focusItem)) normalized.focusSession = null;
+  }
 
   return normalized;
 }
@@ -775,6 +795,25 @@ function normalizeDailyPlan(plan = {}) {
   };
 }
 
+function normalizeFocusSession(session = null) {
+  if (!session || typeof session !== "object") return null;
+  const itemId = String(session.itemId || "").trim();
+  const startedAt = session.startedAt && toDate(session.startedAt) ? session.startedAt : "";
+  const endsAt = session.endsAt && toDate(session.endsAt) ? session.endsAt : "";
+  if (!itemId || !startedAt || !endsAt) return null;
+
+  return {
+    itemId,
+    startedAt,
+    endsAt,
+    durationMinutes: clampNumber(session.durationMinutes, 1, 180, 10),
+    running: session.running !== false,
+    pausedRemainingMs: Math.max(0, Number(session.pausedRemainingMs || 0)),
+    alertEnabled: Boolean(session.alertEnabled),
+    notifiedAt: session.notifiedAt || ""
+  };
+}
+
 function ensureTodayPlan() {
   const current = normalizeDailyPlan(state.todayPlan);
   if (JSON.stringify(current) === JSON.stringify(state.todayPlan)) return;
@@ -807,6 +846,7 @@ function getItem(id) {
 }
 
 function updateItem(id, patch, options = {}) {
+  if (patch.status === "done" || patch.status === "paused" || patch.snoozedUntil) clearFocusForItem(id);
   state.items = state.items.map((item) => {
     if (item.id !== id) return item;
     const now = new Date().toISOString();
@@ -1522,6 +1562,7 @@ function completeCurrentStep(itemId) {
   if (step) {
     step.done = true;
     if (item.status === "inbox") item.status = "active";
+    clearFocusForItem(itemId);
     item.updatedAt = new Date().toISOString();
     item.lastTouched = item.updatedAt;
     saveState();
@@ -1558,6 +1599,7 @@ function markRhythmDone(item) {
 function completeRhythm(itemId) {
   const item = getItem(itemId);
   if (!item || !isRhythm(item)) return;
+  clearFocusForItem(itemId);
   markRhythmDone(item);
   saveState();
   render();
@@ -1601,6 +1643,39 @@ function itemProgress(item) {
 
 function currentTinyStep(item) {
   return firstOpenStep(item.steps) || item.nextAction || "Open this for 5 minutes";
+}
+
+function activeFocusSession() {
+  if (!state.focusSession) return null;
+  const item = getItem(state.focusSession.itemId);
+  if (!item || !isOpen(item)) {
+    state.focusSession = null;
+    saveState();
+    return null;
+  }
+  return state.focusSession;
+}
+
+function isFocusItem(item) {
+  const session = activeFocusSession();
+  return Boolean(session && item && session.itemId === item.id);
+}
+
+function focusDurationMinutes(item) {
+  return clampNumber(item?.estimate, 5, 60, 10);
+}
+
+function sessionRemainingMs(session = activeFocusSession()) {
+  if (!session) return 0;
+  if (!session.running) return Math.max(0, Number(session.pausedRemainingMs || 0));
+  return Math.max(0, toDate(session.endsAt).getTime() - Date.now());
+}
+
+function formatCountdown(milliseconds) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function scoreItem(item) {
@@ -1682,6 +1757,7 @@ function todayCandidateReason(item) {
   const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
   const reviewDays = daysUntil(item.review);
   const window = timeWindowStatus(item);
+  if (isFocusItem(item)) return "focus running";
   if (item.status === "now") return "marked now";
   if (item.status === "red") return "red zone";
   if (isPlannedToday(item)) return "planned today";
@@ -1705,6 +1781,7 @@ function todayQueueScore(item) {
   const reviewDays = daysUntil(item.review);
   const window = timeWindowStatus(item);
 
+  if (isFocusItem(item)) score += 260;
   score += window.boost;
   if (item.mode === "both") score += 4;
   if (isRhythm(item) && dueDays !== null && dueDays <= 0) score += 50;
@@ -1803,6 +1880,21 @@ function makeChip(text, variant = "") {
   chip.className = `info-chip ${variant}`.trim();
   chip.textContent = text;
   return chip;
+}
+
+function makeFocusPill(item) {
+  const pill = document.createElement("button");
+  pill.type = "button";
+  pill.className = "focus-pill";
+  pill.addEventListener("click", openFocusDialog);
+
+  const label = document.createElement("span");
+  label.textContent = "Focus running";
+  const time = document.createElement("strong");
+  time.dataset.focusRemaining = item.id;
+  time.textContent = formatCountdown(sessionRemainingMs());
+  pill.append(label, time);
+  return pill;
 }
 
 function templateMode(template) {
@@ -2211,7 +2303,11 @@ function renderRecommendation() {
 
   const actions = document.createElement("div");
   actions.className = "now-actions";
-  actions.append(createButton(isRhythm(item) ? "Done today" : "Done", "primary-button", () => completeCurrentStep(item.id)));
+  actions.append(createButton(isFocusItem(item) ? "Resume" : "Start", "primary-button", () => {
+    if (isFocusItem(item)) openFocusDialog();
+    else startFocusSession(item.id);
+  }));
+  actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button", () => completeCurrentStep(item.id)));
   actions.append(createButton("Snooze", "secondary-button", () => snoozeItem(item.id, "hour")));
   if (isProject(item)) {
     actions.append(
@@ -2220,7 +2316,9 @@ function renderRecommendation() {
     );
   }
 
-  panel.append(meta, title, reasonRow, tiny, progress, stepMeta, actions);
+  panel.append(meta, title, reasonRow, tiny, progress, stepMeta);
+  if (isFocusItem(item)) panel.append(makeFocusPill(item));
+  panel.append(actions);
   els.recommendationPanel.append(panel);
   if (els.todayQueueList) {
     entries.forEach((entry, index) => els.todayQueueList.append(makeTodayQueueRow(entry, index)));
@@ -2753,6 +2851,7 @@ function renderDetail(item) {
   progressBar.style.width = `${itemProgress(item)}%`;
   progress.append(progressBar);
   summary.append(reasonRow, tiny, progress);
+  if (isFocusItem(item)) summary.append(makeFocusPill(item));
 
   const steps = document.createElement("div");
   steps.className = "detail-steps";
@@ -2784,7 +2883,12 @@ function renderDetail(item) {
 
   const actions = document.createElement("div");
   actions.className = "detail-actions";
-  actions.append(createButton(isRhythm(item) ? "Done today" : "Done", "primary-button", () => {
+  actions.append(createButton(isFocusItem(item) ? "Resume" : "Start", "primary-button", () => {
+    els.detailDialog.close();
+    if (isFocusItem(item)) openFocusDialog();
+    else startFocusSession(item.id);
+  }));
+  actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button", () => {
     completeCurrentStep(item.id);
     els.detailDialog.close();
   }));
@@ -2922,6 +3026,186 @@ function snoozeItem(itemId, duration) {
     snoozedUntil,
     snoozeCount: item.snoozeCount + 1
   }, { touch: false });
+}
+
+function startFocusSession(itemId, minutes) {
+  const item = getItem(itemId);
+  if (!item) return;
+  const now = new Date();
+  const durationMinutes = clampNumber(minutes, 1, 180, focusDurationMinutes(item));
+  state.focusSession = {
+    itemId,
+    startedAt: now.toISOString(),
+    endsAt: new Date(now.getTime() + durationMinutes * 60000).toISOString(),
+    durationMinutes,
+    running: true,
+    pausedRemainingMs: 0,
+    alertEnabled: state.focusSession?.alertEnabled || false,
+    notifiedAt: ""
+  };
+  if (["inbox", "active", "later"].includes(item.status)) item.status = "now";
+  item.plannedFor = todayIso();
+  item.snoozedUntil = "";
+  item.updatedAt = now.toISOString();
+  item.lastTouched = now.toISOString();
+  saveState();
+  render();
+  openFocusDialog();
+}
+
+function clearFocusSession() {
+  if (!state.focusSession) return;
+  state.focusSession = null;
+  saveState();
+  syncFocusTimer();
+}
+
+function clearFocusForItem(itemId) {
+  if (state.focusSession?.itemId === itemId) state.focusSession = null;
+}
+
+function openFocusDialog() {
+  if (!activeFocusSession()) return;
+  renderFocusDialog();
+  if (!els.focusDialog.open) els.focusDialog.showModal();
+  syncFocusTimer();
+}
+
+function updateFocusDisplays() {
+  const session = activeFocusSession();
+  const item = session ? getItem(session.itemId) : null;
+  if (!session || !item) return;
+  const remaining = sessionRemainingMs(session);
+  const durationMs = Math.max(1, Number(session.durationMinutes || 10) * 60000);
+  const completePercent = Math.min(100, Math.max(0, ((durationMs - remaining) / durationMs) * 100));
+  const timeText = formatCountdown(remaining);
+
+  document.querySelectorAll("[data-focus-remaining]").forEach((node) => {
+    node.textContent = remaining <= 0 ? "time up" : `${timeText} left`;
+  });
+
+  if (!els.focusDialog.open) return;
+  els.focusMeta.textContent = itemMeta(item);
+  els.focusTitle.textContent = item.title;
+  els.focusStateLabel.textContent = remaining <= 0 ? "Time is up" : session.running ? "Current step" : "Paused";
+  els.focusTime.textContent = timeText;
+  els.focusProgressBar.style.width = `${completePercent}%`;
+  els.focusStep.textContent = currentTinyStep(item);
+  els.focusDoneButton.textContent = isRhythm(item) ? "Done today" : "Done step";
+  els.focusPauseButton.textContent = session.running ? "Pause" : "Resume";
+
+  const canRequestAlert = "Notification" in window;
+  els.focusNotifyButton.hidden = !canRequestAlert;
+  if (canRequestAlert) {
+    els.focusNotifyButton.disabled = Notification.permission === "denied";
+    if (Notification.permission === "granted" && session.alertEnabled) els.focusNotifyButton.textContent = "Alert on";
+    else if (Notification.permission === "denied") els.focusNotifyButton.textContent = "Alerts blocked";
+    else els.focusNotifyButton.textContent = "Enable alert";
+  }
+}
+
+function renderFocusDialog() {
+  updateFocusDisplays();
+}
+
+function syncFocusTimer() {
+  window.clearInterval(focusTimerId);
+  focusTimerId = 0;
+  if (!activeFocusSession()) return;
+  tickFocusSession();
+  focusTimerId = window.setInterval(tickFocusSession, 1000);
+}
+
+function maybeSendFocusAlert(item) {
+  const session = activeFocusSession();
+  if (!session || !session.alertEnabled || session.notifiedAt) return;
+  session.notifiedAt = new Date().toISOString();
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("Focus time is up", {
+      body: item ? item.title : "Check your current step"
+    });
+  }
+  saveState();
+}
+
+function tickFocusSession() {
+  const session = activeFocusSession();
+  if (!session) {
+    window.clearInterval(focusTimerId);
+    focusTimerId = 0;
+    return;
+  }
+  const item = getItem(session.itemId);
+  const remaining = sessionRemainingMs(session);
+  if (remaining <= 0 && session.running) {
+    session.running = false;
+    session.pausedRemainingMs = 0;
+    maybeSendFocusAlert(item);
+    saveState();
+  }
+  updateFocusDisplays();
+}
+
+function pauseFocusSession() {
+  const session = activeFocusSession();
+  if (!session) return;
+  if (session.running) {
+    session.pausedRemainingMs = sessionRemainingMs(session);
+    session.running = false;
+  } else {
+    session.endsAt = new Date(Date.now() + Math.max(60000, session.pausedRemainingMs)).toISOString();
+    session.pausedRemainingMs = 0;
+    session.running = true;
+    session.notifiedAt = "";
+  }
+  saveState();
+  updateFocusDisplays();
+}
+
+function extendFocusSession(minutes = 5) {
+  const session = activeFocusSession();
+  if (!session) return;
+  const extraMs = minutes * 60000;
+  const remaining = sessionRemainingMs(session);
+  session.durationMinutes += minutes;
+  session.endsAt = new Date(Date.now() + remaining + extraMs).toISOString();
+  session.pausedRemainingMs = 0;
+  session.running = true;
+  session.notifiedAt = "";
+  saveState();
+  syncFocusTimer();
+}
+
+function completeFocusSession() {
+  const session = activeFocusSession();
+  if (!session) return;
+  const itemId = session.itemId;
+  state.focusSession = null;
+  saveState();
+  completeCurrentStep(itemId);
+  if (els.focusDialog.open) els.focusDialog.close();
+  syncFocusTimer();
+}
+
+function snoozeFocusSession() {
+  const session = activeFocusSession();
+  if (!session) return;
+  const itemId = session.itemId;
+  state.focusSession = null;
+  saveState();
+  snoozeItem(itemId, "hour");
+  if (els.focusDialog.open) els.focusDialog.close();
+  syncFocusTimer();
+}
+
+async function enableFocusAlert() {
+  const session = activeFocusSession();
+  if (!session || !("Notification" in window)) return;
+  let permission = Notification.permission;
+  if (permission === "default") permission = await Notification.requestPermission();
+  session.alertEnabled = permission === "granted";
+  saveState();
+  updateFocusDisplays();
 }
 
 function openStuck(itemId) {
@@ -3091,6 +3375,12 @@ function bindEvents() {
 
   els.closeEditButton.addEventListener("click", () => els.itemDialog.close());
   els.closeDetailButton.addEventListener("click", () => els.detailDialog.close());
+  els.closeFocusButton.addEventListener("click", () => els.focusDialog.close());
+  els.focusDoneButton.addEventListener("click", completeFocusSession);
+  els.focusPauseButton.addEventListener("click", pauseFocusSession);
+  els.focusAddFiveButton.addEventListener("click", () => extendFocusSession(5));
+  els.focusSnoozeButton.addEventListener("click", snoozeFocusSession);
+  els.focusNotifyButton.addEventListener("click", enableFocusAlert);
   els.closePlanButton.addEventListener("click", () => els.planDialog.close());
   els.savePlanButton.addEventListener("click", () => {
     els.planDialog.close();
@@ -3135,6 +3425,7 @@ function render() {
   renderProjects();
   renderMap();
   renderReview();
+  syncFocusTimer();
   maybeOpenEmptyWizard();
 }
 

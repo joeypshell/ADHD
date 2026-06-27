@@ -1455,6 +1455,82 @@ dialog::backdrop {
   gap: 8px;
 }
 
+.focus-card {
+  width: min(560px, calc(100vw - 24px));
+  gap: 16px;
+}
+
+.focus-timer-shell {
+  display: grid;
+  gap: 12px;
+  padding: clamp(16px, 5vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(0, 79, 86, 0.1), rgba(255, 255, 255, 0) 58%),
+    #fff;
+  text-align: center;
+}
+
+.focus-time {
+  font-size: clamp(4rem, 18vw, 6.8rem);
+  font-weight: 950;
+  line-height: 0.95;
+  color: var(--teal);
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-line {
+  height: 12px;
+}
+
+.focus-step {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.1rem, 4.5vw, 1.4rem);
+  font-weight: 850;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.focus-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.focus-actions button {
+  min-height: 52px;
+}
+
+.focus-actions .ghost-button {
+  grid-column: 1 / -1;
+}
+
+.focus-pill {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #bed7cd;
+  border-radius: var(--radius);
+  background: var(--teal-soft);
+  color: var(--teal);
+  text-align: left;
+}
+
+.focus-pill span,
+.focus-pill strong {
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.focus-pill strong {
+  font-variant-numeric: tabular-nums;
+}
+
 .plan-card {
   width: min(760px, calc(100vw - 24px));
 }
@@ -1646,6 +1722,14 @@ dialog::backdrop {
     grid-column: 2;
     max-width: none;
     text-align: left;
+  }
+
+  .focus-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-actions .ghost-button {
+    grid-column: auto;
   }
 
   .stats-strip {

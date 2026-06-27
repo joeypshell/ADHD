@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#083d42">
     <title>Life Command Center</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="styles.css">
   </head>
@@ -190,6 +191,31 @@
           <button class="icon-button" type="button" id="closeDetailButton" aria-label="Close">x</button>
         </div>
         <div id="detailBody"></div>
+      </section>
+    </dialog>
+
+    <dialog id="focusDialog">
+      <section class="dialog-card focus-card" aria-labelledby="focusTitle">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow" id="focusMeta">Focus</p>
+            <h2 id="focusTitle">Focus session</h2>
+          </div>
+          <button class="icon-button" type="button" id="closeFocusButton" aria-label="Close">x</button>
+        </div>
+        <div class="focus-timer-shell">
+          <p class="eyebrow" id="focusStateLabel">Current step</p>
+          <div class="focus-time" id="focusTime">10:00</div>
+          <div class="progress-line focus-line" aria-hidden="true"><span id="focusProgressBar"></span></div>
+          <p class="focus-step" id="focusStep"></p>
+        </div>
+        <div class="focus-actions">
+          <button class="primary-button" id="focusDoneButton" type="button">Done step</button>
+          <button class="secondary-button" id="focusPauseButton" type="button">Pause</button>
+          <button class="secondary-button" id="focusAddFiveButton" type="button">+5 min</button>
+          <button class="secondary-button" id="focusSnoozeButton" type="button">Snooze</button>
+          <button class="ghost-button" id="focusNotifyButton" type="button">Enable alert</button>
+        </div>
       </section>
     </dialog>
 
