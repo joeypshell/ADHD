@@ -2,6 +2,8 @@
 
 A static, mobile-first command center for ADHD-style executive function support. It is built for GitHub Pages and runs without a build step.
 
+The primary screen is a Now cockpit: it recommends one next action using local priority rules for due dates, consequences, importance, dread, waiting checkbacks, stale items, and snoozes. Projects, map, capture, and review are secondary views over the same data.
+
 ## Run Locally
 
 From this folder:
@@ -22,6 +24,6 @@ Open `http://localhost:8080`.
 
 ## Data
 
-The app stores data in the browser with `localStorage`. Use the down-arrow button to export a JSON snapshot and the up-arrow button to import one.
+The app stores data in the browser with `localStorage`. Use the `DL` button to export a JSON backup and the `UP` button to import one.
 
 GitHub Pages is static, so it cannot save changes back to GitHub by itself. A future sync version would need a backend, a private database, or an authenticated storage provider.

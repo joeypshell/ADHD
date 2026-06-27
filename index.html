@@ -13,102 +13,171 @@
       <header class="topbar">
         <div>
           <p class="eyebrow" id="todayLabel">Today</p>
-          <h1>Life Command Center</h1>
+          <h1>What do I do now?</h1>
         </div>
         <div class="topbar-actions">
-          <button class="icon-button" id="exportButton" type="button" aria-label="Export snapshot" title="Export snapshot">
-            <span aria-hidden="true">DL</span>
-          </button>
-          <button class="icon-button" id="importButton" type="button" aria-label="Import snapshot" title="Import snapshot">
-            <span aria-hidden="true">UP</span>
-          </button>
+          <button class="icon-button" id="exportButton" type="button" aria-label="Export backup" title="Export backup">DL</button>
+          <button class="icon-button" id="importButton" type="button" aria-label="Import backup" title="Import backup">UP</button>
           <input id="importFile" type="file" accept="application/json" hidden>
         </div>
       </header>
 
       <main>
-        <section class="capture-band" aria-labelledby="captureTitle">
-          <div>
-            <h2 id="captureTitle">Capture</h2>
-          </div>
-          <form class="capture-form" id="captureForm">
-            <label class="sr-only" for="captureInput">New item</label>
-            <input id="captureInput" autocomplete="off" placeholder="Dump the thing here" required>
+        <section class="view is-active" id="nowView" data-view-panel="now" aria-labelledby="nowTitle">
+          <form class="quick-capture" id="quickCaptureForm">
+            <label class="sr-only" for="quickCaptureInput">Capture anything</label>
+            <input id="quickCaptureInput" autocomplete="off" placeholder="Capture anything">
             <button type="submit">Add</button>
+          </form>
+
+          <section class="recommendation-shell" aria-labelledby="nowTitle">
+            <div class="section-heading compact">
+              <div>
+                <p class="eyebrow">Recommended</p>
+                <h2 id="nowTitle">Next action</h2>
+              </div>
+              <button class="secondary-button" id="refreshNowButton" type="button">Refresh</button>
+            </div>
+            <div id="recommendationPanel"></div>
+          </section>
+
+          <section class="stats-strip" aria-label="Board totals">
+            <button class="stat-pill" type="button" data-filter-status="red">
+              <span id="redCount">0</span>
+              <span>Red</span>
+            </button>
+            <button class="stat-pill" type="button" data-filter-status="inbox">
+              <span id="inboxCount">0</span>
+              <span>Inbox</span>
+            </button>
+            <button class="stat-pill" type="button" data-filter-status="waiting">
+              <span id="waitingCount">0</span>
+              <span>Waiting</span>
+            </button>
+            <button class="stat-pill" type="button" data-filter-status="active">
+              <span id="activeCount">0</span>
+              <span>Active</span>
+            </button>
+          </section>
+
+          <section class="cockpit-grid">
+            <div>
+              <div class="section-heading small">
+                <h2>Next queue</h2>
+              </div>
+              <div class="mini-list" id="nextQueueList"></div>
+            </div>
+            <div>
+              <div class="section-heading small">
+                <h2>Red zone</h2>
+              </div>
+              <div class="mini-list" id="redZoneList"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="captureView" data-view-panel="capture" aria-labelledby="captureTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Make it real</p>
+              <h2 id="captureTitle">New item</h2>
+            </div>
+          </div>
+          <form class="item-form" id="itemForm">
+            <label class="span-full">
+              Title
+              <input id="itemTitle" required autocomplete="off" placeholder="What is the thing?">
+            </label>
+            <label>
+              Area
+              <select id="itemArea"></select>
+            </label>
+            <label>
+              Status
+              <select id="itemStatus"></select>
+            </label>
+            <label>
+              Due
+              <input id="itemDue" type="date">
+            </label>
+            <label>
+              Review
+              <input id="itemReview" type="date">
+            </label>
+            <label>
+              Importance
+              <select id="itemImportance">
+                <option value="1">1 low</option>
+                <option value="2">2</option>
+                <option value="3" selected>3 medium</option>
+                <option value="4">4</option>
+                <option value="5">5 high</option>
+              </select>
+            </label>
+            <label>
+              Dread
+              <select id="itemDread">
+                <option value="1">1 easy</option>
+                <option value="2">2</option>
+                <option value="3" selected>3 medium</option>
+                <option value="4">4</option>
+                <option value="5">5 scary</option>
+              </select>
+            </label>
+            <label>
+              Time
+              <select id="itemEstimate">
+                <option value="5">5 min</option>
+                <option value="10" selected>10 min</option>
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="60">60 min</option>
+              </select>
+            </label>
+            <label>
+              Waiting for
+              <input id="itemWaitingFor" autocomplete="off" placeholder="Person, office, reply">
+            </label>
+            <label class="span-full">
+              Tiny start
+              <input id="itemNextAction" autocomplete="off" placeholder="Open the portal for 5 minutes">
+            </label>
+            <label class="span-full">
+              Why it matters
+              <input id="itemConsequence" autocomplete="off" placeholder="Due soon, blocks something, avoids a fee">
+            </label>
+            <label class="span-full">
+              First steps
+              <textarea id="itemSteps" rows="4" placeholder="One step per line"></textarea>
+            </label>
+            <label class="span-full">
+              Notes
+              <textarea id="itemNotes" rows="3"></textarea>
+            </label>
+            <div class="form-actions span-full">
+              <button type="button" class="secondary-button" id="clearItemFormButton">Clear</button>
+              <button type="submit" class="primary-button">Create item</button>
+            </div>
           </form>
         </section>
 
-        <section class="stats-strip" aria-label="Board totals">
-          <button class="stat-pill" type="button" data-filter-status="red">
-            <span id="redCount">0</span>
-            <span>Red</span>
-          </button>
-          <button class="stat-pill" type="button" data-filter-status="now">
-            <span id="nowCount">0</span>
-            <span>Now</span>
-          </button>
-          <button class="stat-pill" type="button" data-filter-status="waiting">
-            <span id="waitingCount">0</span>
-            <span>Waiting</span>
-          </button>
-          <button class="stat-pill" type="button" data-filter-status="inbox">
-            <span id="inboxCount">0</span>
-            <span>Inbox</span>
-          </button>
-        </section>
-
-        <nav class="view-tabs" aria-label="Views">
-          <button class="tab-button is-active" type="button" data-view="launch">Launch</button>
-          <button class="tab-button" type="button" data-view="board">Board</button>
-          <button class="tab-button" type="button" data-view="map">Map</button>
-          <button class="tab-button" type="button" data-view="rhythm">Rhythm</button>
-        </nav>
-
-        <section class="view is-active" id="launchView" data-view-panel="launch" aria-labelledby="launchTitle">
+        <section class="view" id="projectsView" data-view-panel="projects" aria-labelledby="projectsTitle">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Start here</p>
-              <h2 id="launchTitle">Today / Now</h2>
+              <p class="eyebrow">Everything alive</p>
+              <h2 id="projectsTitle">Projects</h2>
             </div>
-            <button class="secondary-button" id="buildNowButton" type="button">Pick 3</button>
+            <select id="areaFilter" aria-label="Filter area"></select>
           </div>
-          <div class="now-list" id="nowList"></div>
-          <div class="launch-grid">
-            <section class="panel" aria-labelledby="redTitle">
-              <div class="panel-heading">
-                <h3 id="redTitle">Red Zone</h3>
-                <span class="count-badge" id="redPanelCount">0</span>
-              </div>
-              <div id="redList"></div>
-            </section>
-            <section class="panel" aria-labelledby="inboxTitle">
-              <div class="panel-heading">
-                <h3 id="inboxTitle">Inbox</h3>
-                <span class="count-badge" id="inboxPanelCount">0</span>
-              </div>
-              <div id="inboxList"></div>
-            </section>
-          </div>
-        </section>
-
-        <section class="view" id="boardView" data-view-panel="board" aria-labelledby="boardTitle">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">One place</p>
-              <h2 id="boardTitle">Board</h2>
-            </div>
-            <select id="areaFilter" aria-label="Filter area">
-              <option value="all">All areas</option>
-            </select>
-          </div>
-          <div class="board-columns" id="boardColumns"></div>
+          <div class="chip-row" id="statusFilters"></div>
+          <div class="project-list" id="projectList"></div>
         </section>
 
         <section class="view" id="mapView" data-view-panel="map" aria-labelledby="mapTitle">
           <div class="section-heading">
             <div>
               <p class="eyebrow">Shape of things</p>
-              <h2 id="mapTitle">Mind Map</h2>
+              <h2 id="mapTitle">Map</h2>
             </div>
             <button class="secondary-button" id="clearFilterButton" type="button">All</button>
           </div>
@@ -118,78 +187,159 @@
           <div class="map-focus" id="mapFocus"></div>
         </section>
 
-        <section class="view" id="rhythmView" data-view-panel="rhythm" aria-labelledby="rhythmTitle">
+        <section class="view" id="reviewView" data-view-panel="review" aria-labelledby="reviewTitle">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Repeatable</p>
-              <h2 id="rhythmTitle">Rhythm</h2>
+              <p class="eyebrow">Reset</p>
+              <h2 id="reviewTitle">Review</h2>
             </div>
-            <button class="secondary-button" id="addRecurringButton" type="button">Add</button>
+            <button class="secondary-button" id="markReviewedButton" type="button">Mark reviewed</button>
           </div>
-          <div class="recurring-list" id="recurringList"></div>
+          <div class="review-grid">
+            <section>
+              <div class="section-heading small">
+                <h2>Needs touch</h2>
+              </div>
+              <div class="mini-list" id="reviewList"></div>
+            </section>
+            <section>
+              <div class="section-heading small">
+                <h2>Rhythm</h2>
+                <button class="secondary-button small-button" id="addRecurringButton" type="button">Add</button>
+              </div>
+              <div class="recurring-list" id="recurringList"></div>
+            </section>
+          </div>
         </section>
       </main>
+
+      <nav class="bottom-nav" aria-label="Views">
+        <button class="nav-button is-active" type="button" data-view="now">Now</button>
+        <button class="nav-button" type="button" data-view="capture">Capture</button>
+        <button class="nav-button" type="button" data-view="projects">Projects</button>
+        <button class="nav-button" type="button" data-view="map">Map</button>
+        <button class="nav-button" type="button" data-view="review">Review</button>
+      </nav>
     </div>
 
-    <template id="itemTemplate">
+    <dialog id="itemDialog">
+      <form class="dialog-card" method="dialog" id="editForm">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Edit</p>
+            <h2 id="editDialogTitle">Item</h2>
+          </div>
+          <button class="icon-button" type="button" id="closeEditButton" aria-label="Close">x</button>
+        </div>
+        <input id="editItemId" type="hidden">
+        <div class="item-form dialog-form">
+          <label class="span-full">
+            Title
+            <input id="editTitle" required>
+          </label>
+          <label>
+            Area
+            <select id="editArea"></select>
+          </label>
+          <label>
+            Status
+            <select id="editStatus"></select>
+          </label>
+          <label>
+            Due
+            <input id="editDue" type="date">
+          </label>
+          <label>
+            Review
+            <input id="editReview" type="date">
+          </label>
+          <label>
+            Importance
+            <select id="editImportance"></select>
+          </label>
+          <label>
+            Dread
+            <select id="editDread"></select>
+          </label>
+          <label>
+            Time
+            <select id="editEstimate"></select>
+          </label>
+          <label>
+            Waiting for
+            <input id="editWaitingFor">
+          </label>
+          <label class="span-full">
+            Tiny start
+            <input id="editNextAction">
+          </label>
+          <label class="span-full">
+            Why it matters
+            <input id="editConsequence">
+          </label>
+          <label class="span-full">
+            Notes
+            <textarea id="editNotes" rows="3"></textarea>
+          </label>
+        </div>
+        <div>
+          <div class="section-heading small">
+            <h2>Steps</h2>
+          </div>
+          <div id="editStepsList" class="edit-steps-list"></div>
+          <div class="step-adder">
+            <label class="sr-only" for="editStepInput">Add step</label>
+            <input id="editStepInput" placeholder="Next tiny step">
+            <button class="secondary-button" id="editStepAddButton" type="button">Add</button>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="danger-button" id="deleteItemButton" type="button">Delete</button>
+          <button class="primary-button" id="saveEditButton" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="stuckDialog">
+      <form class="dialog-card" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Stuck</p>
+            <h2 id="stuckTitle">Make it smaller</h2>
+          </div>
+          <button class="icon-button" type="button" id="closeStuckButton" aria-label="Close">x</button>
+        </div>
+        <p class="dialog-copy" id="stuckCopy"></p>
+        <div class="stuck-actions">
+          <button class="secondary-button" type="button" data-stuck-action="tiny">Add 5-minute opener</button>
+          <button class="secondary-button" type="button" data-stuck-action="red">Move to Red</button>
+          <button class="secondary-button" type="button" data-stuck-action="hour">Snooze 1 hour</button>
+          <button class="secondary-button" type="button" data-stuck-action="tomorrow">Snooze tomorrow</button>
+        </div>
+        <label>
+          Note
+          <textarea id="stuckNote" rows="3" placeholder="What made this hard?"></textarea>
+        </label>
+        <div class="form-actions">
+          <button class="primary-button" type="button" id="saveStuckNoteButton">Save note</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="itemCardTemplate">
       <article class="item-card">
         <div class="item-card-top">
           <div>
             <p class="item-meta"></p>
             <h3 class="item-title"></h3>
           </div>
-          <button class="icon-button small more-button" type="button" aria-label="Edit item" title="Edit item">...</button>
+          <button class="icon-button small edit-button" type="button" aria-label="Edit item" title="Edit item">...</button>
         </div>
-        <div class="progress-line" aria-hidden="true">
-          <span></span>
-        </div>
+        <div class="priority-row"></div>
+        <div class="next-step-box"></div>
+        <div class="progress-line" aria-hidden="true"><span></span></div>
         <ul class="step-list"></ul>
-        <form class="step-form">
-          <label class="sr-only">Add step</label>
-          <input autocomplete="off" placeholder="Next tiny step">
-          <button type="submit">+</button>
-        </form>
-        <div class="item-actions" aria-label="Item actions"></div>
-        <details class="item-editor">
-          <summary>Edit</summary>
-          <div class="editor-grid">
-            <label>
-              Title
-              <input class="edit-title">
-            </label>
-            <label>
-              Area
-              <select class="edit-area"></select>
-            </label>
-            <label>
-              Status
-              <select class="edit-status"></select>
-            </label>
-            <label>
-              Due
-              <input class="edit-due" type="date">
-            </label>
-            <label>
-              Review
-              <input class="edit-review" type="date">
-            </label>
-            <label>
-              Waiting for
-              <input class="edit-waiting">
-            </label>
-            <label class="span-full">
-              Consequence
-              <input class="edit-consequence">
-            </label>
-            <label class="span-full">
-              Notes
-              <textarea class="edit-notes" rows="3"></textarea>
-            </label>
-          </div>
-          <div class="editor-actions">
-            <button class="danger-button delete-button" type="button">Delete</button>
-          </div>
-        </details>
+        <div class="item-actions"></div>
       </article>
     </template>
 
