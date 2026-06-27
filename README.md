@@ -2,7 +2,12 @@
 
 A static, mobile-first command center for ADHD-style executive function support. It is built for GitHub Pages and runs without a build step.
 
-The primary screen is a Now cockpit: it runs a Daily Launch / Shutdown loop and recommends one next action using local priority rules for due dates, consequences, importance, dread, waiting checkbacks, stale items, and snoozes. Projects, map, wizard, and review are secondary views over the same data.
+The primary screen is a Now cockpit: it recommends one clear action, shows recurring rhythms that are due, and keeps the Daily Launch / Shutdown loop tucked into a compact section. Projects, rhythms, map, wizard, and review are secondary views over the same local data.
+
+The app has two lanes:
+
+- Projects: finite things with an endpoint, steps, due/review dates, and stuck handling.
+- Rhythms: recurring life rails like cleaning, gas, working out, weekly reset, and annual/admin maintenance.
 
 Daily Launch gives the day a shape:
 
@@ -12,13 +17,13 @@ Daily Launch gives the day a shape:
 
 Shutdown captures what changed, shows open-loop counts, and marks the daily rhythm complete.
 
-The Wizard tab guides task setup with three paths:
+The Wizard tab guides setup with three paths:
 
-- Add a thing
-- Break down a project
+- Project
+- Rhythm
 - Rescue something scary
 
-Each path asks small questions, allows "I don't know," and creates a structured item with a tiny start and checkable steps.
+Each path asks small questions, allows "I don't know," and creates a structured item with a tiny start. Rhythm setup includes cadence, trigger, and minimum version.
 
 ## Run Locally
 

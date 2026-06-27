@@ -25,59 +25,97 @@ const STATUSES = [
 
 const ESTIMATES = [5, 10, 15, 30, 60];
 
+const ITEM_KINDS = [
+  { id: "project", label: "Project" },
+  { id: "rhythm", label: "Rhythm" }
+];
+
+const CADENCES = [
+  { id: "daily", label: "Daily", days: 1 },
+  { id: "every2", label: "Every 2 days", days: 2 },
+  { id: "weekly", label: "Weekly", days: 7 },
+  { id: "biweekly", label: "Every 2 weeks", days: 14 },
+  { id: "monthly", label: "Monthly", days: 30 },
+  { id: "quarterly", label: "Quarterly", days: 91 },
+  { id: "yearly", label: "Yearly", days: 365 },
+  { id: "asneeded", label: "As needed", days: null }
+];
+
+const DEFAULT_RHYTHMS = [
+  {
+    title: "Daily launch",
+    area: "Unsorted",
+    cadence: "daily",
+    trigger: "Before work or messages",
+    minimum: "Pick one action",
+    system: true
+  },
+  {
+    title: "Shutdown",
+    area: "Unsorted",
+    cadence: "daily",
+    trigger: "End of workday or evening",
+    minimum: "Update the open loops",
+    system: true
+  },
+  {
+    title: "Weekly reset",
+    area: "Home / Admin",
+    cadence: "weekly",
+    trigger: "Chosen reset day",
+    minimum: "Review Red, Waiting, due dates"
+  },
+  {
+    title: "Clean kitchen",
+    area: "Home / Admin",
+    cadence: "daily",
+    trigger: "After dinner or before bed",
+    minimum: "Clear one surface for 5 minutes"
+  },
+  {
+    title: "Get gas",
+    area: "Home / Admin",
+    cadence: "weekly",
+    trigger: "When fuel is under half",
+    minimum: "Check fuel level"
+  },
+  {
+    title: "Work out",
+    area: "Body / Exercise",
+    cadence: "daily",
+    trigger: "Before the day starts",
+    minimum: "Start the warmup"
+  }
+];
+
 const DEFAULT_DATA = {
-  version: 2,
+  version: 3,
   createdAt: new Date().toISOString(),
   lastReviewed: "",
   filter: { area: "all", status: "" },
   todayPlan: createDailyPlan(),
-  items: [],
-  recurring: [
-    {
-      id: cryptoId(),
-      title: "Daily launch",
-      cadence: "Daily",
-      trigger: "Before work or messages",
-      minimum: "Pick one action",
-      lastDone: ""
-    },
-    {
-      id: cryptoId(),
-      title: "Shutdown",
-      cadence: "Daily",
-      trigger: "End of workday or evening",
-      minimum: "Update the open loops",
-      lastDone: ""
-    },
-    {
-      id: cryptoId(),
-      title: "Weekly reset",
-      cadence: "Weekly",
-      trigger: "Chosen reset day",
-      minimum: "Review Red, Waiting, due dates",
-      lastDone: ""
-    }
-  ]
+  items: DEFAULT_RHYTHMS.map((rhythm) => createRhythmItem(rhythm)),
+  recurring: []
 };
 
 const WIZARD_MODES = {
-  thing: {
-    label: "Add a thing",
-    description: "For one obligation, errand, admin task, or work item.",
-    steps: ["mode", "title", "area", "timing", "consequence", "waiting", "tiny", "summary"],
-    defaults: { status: "inbox", importance: 3, dread: 3, estimate: 10 }
-  },
   project: {
-    label: "Break down a project",
-    description: "For something with multiple steps or an unclear finish line.",
+    label: "Project",
+    description: "A one-time thing with an endpoint, even if it has many steps.",
     steps: ["mode", "title", "area", "done", "steps", "timing", "consequence", "tiny", "summary"],
-    defaults: { status: "active", importance: 3, dread: 3, estimate: 15 }
+    defaults: { kind: "project", status: "active", importance: 3, dread: 3, estimate: 15 }
+  },
+  rhythm: {
+    label: "Rhythm",
+    description: "A recurring life rail that needs to come back forever.",
+    steps: ["mode", "title", "area", "cadence", "tiny", "summary"],
+    defaults: { kind: "rhythm", status: "active", importance: 4, dread: 2, estimate: 5, cadence: "weekly" }
   },
   rescue: {
     label: "Rescue something scary",
     description: "For something late, avoided, embarrassing, or consequence-heavy.",
     steps: ["mode", "title", "fear", "timing", "consequence", "tiny", "steps", "summary"],
-    defaults: { status: "red", importance: 5, dread: 5, estimate: 10 }
+    defaults: { kind: "project", status: "red", importance: 5, dread: 5, estimate: 10 }
   }
 };
 
@@ -92,18 +130,18 @@ const CONSEQUENCE_OPTIONS = [
 ];
 
 const STEP_SUGGESTIONS = {
-  thing: [
-    "Open the place where this lives for 5 minutes",
-    "Find the next missing piece",
-    "Do or send one small piece",
-    "Update this item"
-  ],
   project: [
     "Define what done looks like",
     "List the known pieces",
     "Find the next missing piece",
     "Do the first visible step",
     "Update this project"
+  ],
+  rhythm: [
+    "Do the minimum version",
+    "Put the required tools in sight",
+    "Reset the space for 5 minutes",
+    "Mark this rhythm done"
   ],
   rescue: [
     "Open the scary thing for 5 minutes",
@@ -116,7 +154,7 @@ const STEP_SUGGESTIONS = {
 
 let state = loadState();
 let stuckItemId = "";
-let wizard = createWizardState("thing");
+let wizard = createWizardState("project");
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -135,8 +173,7 @@ const els = {
   inboxCount: document.querySelector("#inboxCount"),
   waitingCount: document.querySelector("#waitingCount"),
   activeCount: document.querySelector("#activeCount"),
-  nextQueueList: document.querySelector("#nextQueueList"),
-  redZoneList: document.querySelector("#redZoneList"),
+  rhythmDueList: document.querySelector("#rhythmDueList"),
   resetWizardButton: document.querySelector("#resetWizardButton"),
   wizardModeLabel: document.querySelector("#wizardModeLabel"),
   wizardStepTitle: document.querySelector("#wizardStepTitle"),
@@ -154,7 +191,7 @@ const els = {
   mapFocus: document.querySelector("#mapFocus"),
   reviewList: document.querySelector("#reviewList"),
   recurringList: document.querySelector("#recurringList"),
-  addRecurringButton: document.querySelector("#addRecurringButton"),
+  addRhythmButtons: document.querySelectorAll("[data-add-rhythm]"),
   markReviewedButton: document.querySelector("#markReviewedButton"),
   itemDialog: document.querySelector("#itemDialog"),
   editForm: document.querySelector("#editForm"),
@@ -162,6 +199,7 @@ const els = {
   editDialogTitle: document.querySelector("#editDialogTitle"),
   editItemId: document.querySelector("#editItemId"),
   editTitle: document.querySelector("#editTitle"),
+  editKind: document.querySelector("#editKind"),
   editArea: document.querySelector("#editArea"),
   editStatus: document.querySelector("#editStatus"),
   editDue: document.querySelector("#editDue"),
@@ -170,6 +208,9 @@ const els = {
   editDread: document.querySelector("#editDread"),
   editEstimate: document.querySelector("#editEstimate"),
   editWaitingFor: document.querySelector("#editWaitingFor"),
+  editCadence: document.querySelector("#editCadence"),
+  editTrigger: document.querySelector("#editTrigger"),
+  editMinimum: document.querySelector("#editMinimum"),
   editNextAction: document.querySelector("#editNextAction"),
   editConsequence: document.querySelector("#editConsequence"),
   editNotes: document.querySelector("#editNotes"),
@@ -216,6 +257,90 @@ function createDailyPlan(date = todayIso()) {
     minimumText: "",
     shutdownNote: ""
   };
+}
+
+function normalizeKind(kind) {
+  return kind === "rhythm" ? "rhythm" : "project";
+}
+
+function cadenceMeta(cadence) {
+  return CADENCES.find((entry) => entry.id === normalizeCadence(cadence)) || CADENCES[2];
+}
+
+function normalizeCadence(cadence) {
+  const value = String(cadence || "").toLowerCase().trim();
+  const direct = CADENCES.find((entry) => entry.id === value || entry.label.toLowerCase() === value);
+  if (direct) return direct.id;
+  if (value.includes("day")) return "daily";
+  if (value.includes("week") && value.includes("2")) return "biweekly";
+  if (value.includes("week")) return "weekly";
+  if (value.includes("month")) return "monthly";
+  if (value.includes("quarter")) return "quarterly";
+  if (value.includes("year") || value.includes("annual")) return "yearly";
+  return "weekly";
+}
+
+function addDaysToIso(value, days) {
+  const date = toDate(value) || new Date(`${todayIso()}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function nextRhythmDue(lastDone, cadence) {
+  const meta = cadenceMeta(cadence);
+  if (meta.days === null) return "";
+  if (!lastDone) return todayIso();
+  return addDaysToIso(lastDone, meta.days);
+}
+
+function createRhythmItem(input = {}) {
+  const minimum = input.minimum || input.nextAction || "Do the minimum version";
+  const cadence = normalizeCadence(input.cadence || "weekly");
+  const lastDone = input.lastDone || "";
+  return {
+    id: input.id || cryptoId(),
+    kind: "rhythm",
+    title: String(input.title || "Recurring rhythm").trim(),
+    area: AREAS.includes(input.area) ? input.area : "Unsorted",
+    status: normalizeStatus(input.status || "active"),
+    due: "",
+    review: input.review || "",
+    cadence,
+    trigger: input.trigger || "",
+    minimum,
+    lastDone,
+    nextDue: input.nextDue || nextRhythmDue(lastDone, cadence),
+    consequence: input.consequence || "Recurring life rail",
+    nextAction: input.nextAction || minimum,
+    importance: clampNumber(input.importance, 1, 5, 4),
+    dread: clampNumber(input.dread, 1, 5, 2),
+    estimate: ESTIMATES.includes(Number(input.estimate)) ? Number(input.estimate) : 5,
+    waitingFor: input.waitingFor || "",
+    notes: input.notes || "",
+    system: Boolean(input.system),
+    createdAt: input.createdAt || new Date().toISOString(),
+    updatedAt: input.updatedAt || new Date().toISOString(),
+    lastTouched: input.lastTouched || input.updatedAt || input.createdAt || "",
+    snoozedUntil: input.snoozedUntil || "",
+    snoozeCount: Number(input.snoozeCount || 0),
+    steps: normalizeSteps(input.steps || [minimum], minimum)
+  };
+}
+
+function legacyRecurringToRhythm(item) {
+  const title = item.title || "Recurring rhythm";
+  const system = ["daily launch", "shutdown"].includes(String(title).toLowerCase());
+  return createRhythmItem({
+    id: `rhythm-${item.id || cryptoId()}`,
+    title,
+    cadence: item.cadence || "weekly",
+    trigger: item.trigger || "",
+    minimum: item.minimum || "Touch it for 5 minutes",
+    lastDone: item.lastDone || "",
+    system,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
+  });
 }
 
 function tomorrowAt(hour) {
@@ -272,58 +397,107 @@ function loadState() {
 }
 
 function normalizeData(data) {
+  const legacyRecurring = Array.isArray(data.recurring) ? data.recurring : [];
+  const sourceItems = Array.isArray(data.items) ? data.items : [];
+  const migratedRhythms = legacyRecurring
+    .map(legacyRecurringToRhythm)
+    .filter((rhythm) => !sourceItems.some((item) => item.id === rhythm.id || item.sourceRecurringId === rhythm.id));
+
   const normalized = {
     ...cloneData(DEFAULT_DATA),
     ...data,
-    version: 2,
-    filter: { area: "all", status: "", ...(data.filter || {}) },
+    version: 3,
+    filter: { area: "all", status: "", kind: "", ...(data.filter || {}) },
     todayPlan: normalizeDailyPlan(data.todayPlan),
-    items: Array.isArray(data.items) ? data.items : [],
-    recurring: Array.isArray(data.recurring) ? data.recurring : DEFAULT_DATA.recurring
+    items: [...sourceItems, ...migratedRhythms],
+    recurring: []
   };
 
-  normalized.items = normalized.items.map((item) => {
-    const steps = Array.isArray(item.steps)
-      ? item.steps.map((step) => ({
-          id: step.id || cryptoId(),
-          text: String(step.text || "").trim(),
-          done: Boolean(step.done)
-        })).filter((step) => step.text)
-      : [];
-
-    return {
-      id: item.id || cryptoId(),
-      title: String(item.title || "Untitled").trim(),
-      area: AREAS.includes(item.area) ? item.area : "Unsorted",
-      status: normalizeStatus(item.status),
-      due: item.due || "",
-      review: item.review || "",
-      consequence: item.consequence || "",
-      nextAction: item.nextAction || firstOpenStep(steps) || "",
-      importance: clampNumber(item.importance, 1, 5, 3),
-      dread: clampNumber(item.dread, 1, 5, 3),
-      estimate: ESTIMATES.includes(Number(item.estimate)) ? Number(item.estimate) : 10,
-      waitingFor: item.waitingFor || "",
-      notes: item.notes || "",
-      createdAt: item.createdAt || new Date().toISOString(),
-      updatedAt: item.updatedAt || new Date().toISOString(),
-      lastTouched: item.lastTouched || item.updatedAt || item.createdAt || "",
-      snoozedUntil: item.snoozedUntil || "",
-      snoozeCount: Number(item.snoozeCount || 0),
-      steps
-    };
-  });
-
-  normalized.recurring = normalized.recurring.map((item) => ({
-    id: item.id || cryptoId(),
-    title: item.title || "Recurring item",
-    cadence: item.cadence || "Weekly",
-    trigger: item.trigger || "",
-    minimum: item.minimum || "",
-    lastDone: item.lastDone || ""
-  }));
+  normalized.items = normalized.items.map(normalizeItem);
 
   return normalized;
+}
+
+function normalizeItem(item) {
+  const kind = normalizeKind(item.kind);
+  if (kind === "rhythm") return normalizeRhythmItem(item);
+
+  const steps = normalizeStepObjects(item.steps);
+  return {
+    id: item.id || cryptoId(),
+    kind: "project",
+    title: String(item.title || "Untitled").trim(),
+    area: AREAS.includes(item.area) ? item.area : "Unsorted",
+    status: normalizeStatus(item.status),
+    due: item.due || "",
+    review: item.review || "",
+    cadence: "",
+    trigger: "",
+    minimum: "",
+    lastDone: "",
+    nextDue: "",
+    consequence: item.consequence || "",
+    nextAction: item.nextAction || firstOpenStep(steps) || "",
+    importance: clampNumber(item.importance, 1, 5, 3),
+    dread: clampNumber(item.dread, 1, 5, 3),
+    estimate: ESTIMATES.includes(Number(item.estimate)) ? Number(item.estimate) : 10,
+    waitingFor: item.waitingFor || "",
+    notes: item.notes || "",
+    system: Boolean(item.system),
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
+    lastTouched: item.lastTouched || item.updatedAt || item.createdAt || "",
+    snoozedUntil: item.snoozedUntil || "",
+    snoozeCount: Number(item.snoozeCount || 0),
+    steps
+  };
+}
+
+function normalizeRhythmItem(item) {
+  const minimum = item.minimum || item.nextAction || "Do the minimum version";
+  const cadence = normalizeCadence(item.cadence || "weekly");
+  const lastDone = item.lastDone || "";
+  const steps = normalizeStepObjects(item.steps);
+  if (!steps.length) steps.push({ id: cryptoId(), text: minimum, done: false });
+
+  return {
+    id: item.id || cryptoId(),
+    kind: "rhythm",
+    title: String(item.title || "Recurring rhythm").trim(),
+    area: AREAS.includes(item.area) ? item.area : "Unsorted",
+    status: normalizeStatus(item.status || "active"),
+    due: "",
+    review: item.review || "",
+    cadence,
+    trigger: item.trigger || "",
+    minimum,
+    lastDone,
+    nextDue: item.nextDue || nextRhythmDue(lastDone, cadence),
+    consequence: item.consequence || "Recurring life rail",
+    nextAction: item.nextAction || minimum,
+    importance: clampNumber(item.importance, 1, 5, 4),
+    dread: clampNumber(item.dread, 1, 5, 2),
+    estimate: ESTIMATES.includes(Number(item.estimate)) ? Number(item.estimate) : 5,
+    waitingFor: item.waitingFor || "",
+    notes: item.notes || "",
+    system: Boolean(item.system),
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
+    lastTouched: item.lastTouched || item.updatedAt || item.createdAt || "",
+    snoozedUntil: item.snoozedUntil || "",
+    snoozeCount: Number(item.snoozeCount || 0),
+    steps
+  };
+}
+
+function normalizeStepObjects(steps) {
+  return Array.isArray(steps)
+    ? steps.map((step) => ({
+        id: step.id || cryptoId(),
+        text: String(step.text || step || "").trim(),
+        done: Boolean(step.done)
+      })).filter((step) => step.text)
+    : [];
 }
 
 function normalizeDailyPlan(plan = {}) {
@@ -398,11 +572,17 @@ function addItem(input) {
   const item = normalizeData({
     items: [{
       id: cryptoId(),
+      kind: input.kind || "project",
       title: input.title,
       area: input.area || "Unsorted",
-      status: input.status || "inbox",
+      status: input.status || (input.kind === "rhythm" ? "active" : "inbox"),
       due: input.due || "",
       review: input.review || "",
+      cadence: input.cadence || "",
+      trigger: input.trigger || "",
+      minimum: input.minimum || "",
+      lastDone: input.lastDone || "",
+      nextDue: input.nextDue || "",
       consequence: input.consequence || "",
       nextAction: input.nextAction || "",
       importance: input.importance || 3,
@@ -410,6 +590,7 @@ function addItem(input) {
       estimate: input.estimate || 10,
       waitingFor: input.waitingFor || "",
       notes: input.notes || "",
+      system: Boolean(input.system),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       lastTouched: "",
@@ -431,7 +612,7 @@ function normalizeSteps(steps, nextAction) {
 }
 
 function createWizardState(mode) {
-  const safeMode = WIZARD_MODES[mode] ? mode : "thing";
+  const safeMode = WIZARD_MODES[mode] ? mode : "project";
   const meta = WIZARD_MODES[safeMode];
   return {
     mode: safeMode,
@@ -439,9 +620,13 @@ function createWizardState(mode) {
     data: {
       title: "",
       area: "Unsorted",
+      kind: meta.defaults.kind,
       status: meta.defaults.status,
       due: "",
       review: "",
+      cadence: meta.defaults.cadence || "weekly",
+      trigger: "",
+      minimum: "",
       consequenceTags: [],
       customConsequence: "",
       fear: "",
@@ -465,7 +650,7 @@ function currentWizardStep() {
   return currentWizardSteps()[wizard.stepIndex];
 }
 
-function resetWizard(mode = "thing") {
+function resetWizard(mode = "project") {
   wizard = createWizardState(mode);
   renderWizard();
 }
@@ -473,8 +658,9 @@ function resetWizard(mode = "thing") {
 function wizardStepTitle(step) {
   const titles = {
     mode: "Choose a path",
-    title: "Name the thing",
+    title: "Name it",
     area: "Where does it belong?",
+    cadence: "How often does it repeat?",
     timing: "When does it matter?",
     consequence: "Why does it matter?",
     waiting: "Is someone else involved?",
@@ -512,6 +698,7 @@ function renderWizardStep(step) {
     placeholder: "Example: renew car sticker"
   });
   if (step === "area") return renderWizardArea();
+  if (step === "cadence") return renderWizardCadence();
   if (step === "timing") return renderWizardTiming();
   if (step === "consequence") return renderWizardConsequence();
   if (step === "waiting") return renderWizardWaiting();
@@ -539,7 +726,7 @@ function wizardPanel(prompt) {
 }
 
 function renderWizardMode() {
-  const panel = wizardPanel("What kind of setup do you need?");
+  const panel = wizardPanel("Is this a finite project, a recurring rhythm, or something scary to rescue?");
   const grid = document.createElement("div");
   grid.className = "wizard-option-grid";
 
@@ -592,6 +779,40 @@ function renderWizardArea() {
     }));
   });
   panel.append(grid);
+  return panel;
+}
+
+function renderWizardCadence() {
+  const panel = wizardPanel("Choose how this rhythm should come back. You can tune it later.");
+  panel.append(makeChoiceGroup("Cadence", CADENCES, wizard.data.cadence, (value) => {
+    wizard.data.cadence = value;
+    renderWizard();
+  }));
+
+  const triggerLabel = document.createElement("label");
+  triggerLabel.className = "wizard-field";
+  triggerLabel.textContent = "Trigger";
+  const triggerInput = document.createElement("input");
+  triggerInput.value = wizard.data.trigger;
+  triggerInput.placeholder = "Example: after dinner, Sunday morning, under half tank";
+  triggerInput.addEventListener("input", () => {
+    wizard.data.trigger = triggerInput.value;
+  });
+  triggerLabel.append(triggerInput);
+
+  const minimumLabel = document.createElement("label");
+  minimumLabel.className = "wizard-field";
+  minimumLabel.textContent = "Minimum version";
+  const minimumInput = document.createElement("input");
+  minimumInput.value = wizard.data.minimum;
+  minimumInput.placeholder = "Example: clear one surface for 5 minutes";
+  minimumInput.addEventListener("input", () => {
+    wizard.data.minimum = minimumInput.value;
+    if (!wizard.data.nextAction.trim()) wizard.data.nextAction = minimumInput.value;
+  });
+  minimumLabel.append(minimumInput);
+
+  panel.append(triggerLabel, minimumLabel);
   return panel;
 }
 
@@ -700,7 +921,7 @@ function renderWizardWaiting() {
 
 function renderWizardTiny() {
   const panel = wizardPanel("Choose the first physical action small enough to start while tired.");
-  const suggestions = STEP_SUGGESTIONS[wizard.mode] || STEP_SUGGESTIONS.thing;
+  const suggestions = STEP_SUGGESTIONS[wizard.mode] || STEP_SUGGESTIONS.project;
   const grid = document.createElement("div");
   grid.className = "wizard-option-grid";
   suggestions.forEach((step) => {
@@ -728,7 +949,7 @@ function renderWizardTiny() {
 
 function renderWizardSteps() {
   const panel = wizardPanel("Add a few visible steps. They can be rough and incomplete.");
-  const suggestions = STEP_SUGGESTIONS[wizard.mode] || STEP_SUGGESTIONS.thing;
+  const suggestions = STEP_SUGGESTIONS[wizard.mode] || STEP_SUGGESTIONS.project;
   const grid = document.createElement("div");
   grid.className = "wizard-chip-grid";
   suggestions.forEach((step) => {
@@ -793,8 +1014,11 @@ function renderWizardSummary() {
   const meta = document.createElement("p");
   meta.className = "item-meta";
   meta.textContent = [
+    item.kind === "rhythm" ? "Rhythm" : "Project",
     item.area,
     statusLabel(item.status),
+    item.cadence ? cadenceMeta(item.cadence).label : "",
+    item.nextDue ? `Due ${formatDate(item.nextDue)}` : "",
     item.due ? `Due ${formatDate(item.due)}` : "",
     item.review ? `Review ${formatDate(item.review)}` : ""
   ].filter(Boolean).join(" / ");
@@ -829,7 +1053,8 @@ function makeChoiceGroup(labelText, choices, selected, onChoose) {
   const grid = document.createElement("div");
   grid.className = "wizard-chip-grid";
   choices.forEach((choice) => {
-    grid.append(makeWizardChoice(choice.label, selected === choice.value, () => onChoose(choice.value)));
+    const value = choice.value ?? choice.id;
+    grid.append(makeWizardChoice(choice.label, selected === value, () => onChoose(value)));
   });
   wrap.append(label, grid);
   return wrap;
@@ -876,13 +1101,16 @@ function wizardSkip() {
 
 function applyWizardDefault(step, skipped = false) {
   if (step === "title" && !wizard.data.title.trim()) {
-    wizard.data.title = wizard.mode === "rescue" ? "Scary thing to rescue" : "New item";
+    wizard.data.title = wizard.mode === "rescue" ? "Scary thing to rescue" : wizard.mode === "rhythm" ? "New rhythm" : "New project";
+  }
+  if (step === "cadence" && !wizard.data.minimum.trim()) {
+    wizard.data.minimum = STEP_SUGGESTIONS.rhythm[0];
   }
   if (step === "tiny" && !wizard.data.nextAction.trim()) {
     wizard.data.nextAction = STEP_SUGGESTIONS[wizard.mode][0];
   }
   if (step === "steps" && !wizard.data.steps.length) {
-    wizard.data.steps = STEP_SUGGESTIONS[wizard.mode].slice(0, wizard.mode === "thing" ? 3 : 5);
+    wizard.data.steps = STEP_SUGGESTIONS[wizard.mode].slice(0, 5);
   }
   if (step === "waiting" && skipped && wizard.data.status === "waiting" && !wizard.data.waitingFor.trim()) {
     wizard.data.status = WIZARD_MODES[wizard.mode].defaults.status;
@@ -901,17 +1129,26 @@ function buildWizardItem() {
   if (wizard.data.notes.trim()) notes.push(wizard.data.notes.trim());
 
   const nextAction = wizard.data.nextAction.trim() || STEP_SUGGESTIONS[wizard.mode][0];
-  const steps = wizard.data.steps.length ? wizard.data.steps : [nextAction];
+  const minimum = wizard.data.minimum.trim() || nextAction;
+  const steps = wizard.mode === "rhythm"
+    ? [minimum]
+    : wizard.data.steps.length ? wizard.data.steps : [nextAction];
   let status = wizard.data.status || defaults.status;
   if (wizard.data.waitingFor.trim()) status = "waiting";
   if (wizard.mode === "rescue") status = "red";
+  if (wizard.mode === "rhythm") status = "active";
 
   return {
-    title: wizard.data.title.trim() || "New item",
+    kind: defaults.kind,
+    title: wizard.data.title.trim() || (wizard.mode === "rhythm" ? "New rhythm" : "New project"),
     area: wizard.data.area || "Unsorted",
     status,
-    due: wizard.data.due,
-    review: wizard.data.review || (status === "waiting" ? dateOffset(2) : ""),
+    due: wizard.mode === "rhythm" ? "" : wizard.data.due,
+    review: wizard.mode === "rhythm" ? "" : wizard.data.review || (status === "waiting" ? dateOffset(2) : ""),
+    cadence: wizard.mode === "rhythm" ? wizard.data.cadence : "",
+    trigger: wizard.mode === "rhythm" ? wizard.data.trigger.trim() : "",
+    minimum: wizard.mode === "rhythm" ? minimum : "",
+    nextDue: wizard.mode === "rhythm" ? nextRhythmDue("", wizard.data.cadence) : "",
     consequence: consequenceParts.join(", "),
     nextAction,
     importance: wizard.data.importance || defaults.importance,
@@ -954,6 +1191,10 @@ function removeStep(itemId, stepId) {
 function completeCurrentStep(itemId) {
   const item = getItem(itemId);
   if (!item) return;
+  if (isRhythm(item)) {
+    completeRhythm(itemId);
+    return;
+  }
   const step = item.steps.find((entry) => !entry.done);
   if (step) {
     step.done = true;
@@ -970,10 +1211,41 @@ function completeCurrentStep(itemId) {
 function completeItem(itemId) {
   const item = getItem(itemId);
   if (!item) return;
+  if (isRhythm(item)) {
+    completeRhythm(itemId);
+    return;
+  }
   updateItem(itemId, {
     status: "done",
     steps: item.steps.map((step) => ({ ...step, done: true }))
   });
+}
+
+function markRhythmDone(item) {
+  const now = new Date().toISOString();
+  item.lastDone = todayIso();
+  item.nextDue = nextRhythmDue(item.lastDone, item.cadence);
+  item.status = "active";
+  item.snoozedUntil = "";
+  item.steps = item.steps.map((step) => ({ ...step, done: false }));
+  item.updatedAt = now;
+  item.lastTouched = now;
+}
+
+function completeRhythm(itemId) {
+  const item = getItem(itemId);
+  if (!item || !isRhythm(item)) return;
+  markRhythmDone(item);
+  saveState();
+  render();
+}
+
+function isRhythm(item) {
+  return item.kind === "rhythm";
+}
+
+function isProject(item) {
+  return item.kind !== "rhythm";
 }
 
 function isSnoozed(item) {
@@ -983,6 +1255,10 @@ function isSnoozed(item) {
 
 function isOpen(item) {
   return item.status !== "done" && item.status !== "paused";
+}
+
+function isUserVisibleItem(item) {
+  return !item.system;
 }
 
 function itemProgress(item) {
@@ -996,7 +1272,7 @@ function currentTinyStep(item) {
 }
 
 function scoreItem(item) {
-  if (!isOpen(item) || isSnoozed(item)) return -9999;
+  if (!isOpen(item) || isSnoozed(item) || !isUserVisibleItem(item)) return -9999;
 
   let score = 0;
   if (item.status === "now") score += 120;
@@ -1006,12 +1282,12 @@ function scoreItem(item) {
   if (item.status === "later") score -= 20;
   if (item.status === "waiting") score -= 35;
 
-  const dueDays = daysUntil(item.due);
+  const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
   if (dueDays !== null) {
-    if (dueDays < 0) score += 120 + Math.min(40, Math.abs(dueDays) * 4);
-    else if (dueDays === 0) score += 95;
-    else if (dueDays <= 2) score += 70;
-    else if (dueDays <= 7) score += 35;
+    if (dueDays < 0) score += (isRhythm(item) ? 90 : 120) + Math.min(40, Math.abs(dueDays) * 4);
+    else if (dueDays === 0) score += isRhythm(item) ? 80 : 95;
+    else if (dueDays <= 2) score += isRhythm(item) ? 26 : 70;
+    else if (dueDays <= 7) score += isRhythm(item) ? 4 : 35;
     else if (dueDays <= 14) score += 12;
   }
 
@@ -1041,9 +1317,10 @@ function scoreItem(item) {
 
 function recommendationReason(item) {
   const reasons = [];
-  const dueDays = daysUntil(item.due);
+  const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
   const reviewDays = daysUntil(item.review);
 
+  if (isRhythm(item)) reasons.push("rhythm");
   if (item.status === "red") reasons.push("red zone");
   if (dueDays !== null) {
     if (dueDays < 0) reasons.push(`overdue ${Math.abs(dueDays)}d`);
@@ -1068,6 +1345,7 @@ function recommendedItems() {
 }
 
 function sortDateValue(item) {
+  if (isRhythm(item)) return item.nextDue || "9999-12-31";
   return item.due || item.review || "9999-12-31";
 }
 
@@ -1084,8 +1362,11 @@ function statusLabel(statusId) {
 }
 
 function itemMeta(item) {
-  const parts = [item.area, statusLabel(item.status)];
-  if (item.due) parts.push(`Due ${formatDate(item.due)}`);
+  const parts = [isRhythm(item) ? "Rhythm" : "Project", item.area, statusLabel(item.status)];
+  if (isRhythm(item)) {
+    parts.push(cadenceMeta(item.cadence).label);
+    if (item.nextDue) parts.push(`Due ${formatDate(item.nextDue)}`);
+  } else if (item.due) parts.push(`Due ${formatDate(item.due)}`);
   if (item.review) parts.push(`Review ${formatDate(item.review)}`);
   if (isSnoozed(item)) parts.push(`Snoozed ${formatDateTime(item.snoozedUntil)}`);
   return parts.join(" / ");
@@ -1093,9 +1374,11 @@ function itemMeta(item) {
 
 function visibleItems(items) {
   return items.filter((item) => {
+    if (!isUserVisibleItem(item)) return false;
     const areaOk = state.filter.area === "all" || item.area === state.filter.area;
     const statusOk = !state.filter.status || item.status === state.filter.status;
-    return areaOk && statusOk;
+    const kindOk = !state.filter.kind || item.kind === state.filter.kind;
+    return areaOk && statusOk && kindOk;
   });
 }
 
@@ -1149,8 +1432,8 @@ function dailyPicks() {
 }
 
 function markRecurringDone(title) {
-  const item = state.recurring.find((entry) => entry.title.toLowerCase() === title.toLowerCase());
-  if (item) item.lastDone = todayIso();
+  const item = state.items.find((entry) => isRhythm(entry) && entry.title.toLowerCase() === title.toLowerCase());
+  if (item) markRhythmDone(item);
 }
 
 function promoteItemToNow(item) {
@@ -1241,7 +1524,7 @@ function reopenDailyShutdown() {
 function touchedTodayItems() {
   const today = todayIso();
   return sortedItems(state.items.filter((item) => {
-    if (!isOpen(item)) return false;
+    if (!isOpen(item) || !isUserVisibleItem(item)) return false;
     return [item.lastTouched, item.updatedAt].some((value) => String(value || "").startsWith(today));
   })).slice(0, 3);
 }
@@ -1345,8 +1628,8 @@ function renderDailyShutdown() {
   counts.className = "daily-metrics";
   counts.append(
     makeChip(`${reviewItems().length} review`),
-    makeChip(`${state.items.filter((item) => item.status === "red" && isOpen(item)).length} red`),
-    makeChip(`${state.items.filter((item) => item.status === "waiting" && isOpen(item)).length} waiting`)
+    makeChip(`${state.items.filter((item) => item.status === "red" && isOpen(item) && isUserVisibleItem(item)).length} red`),
+    makeChip(`${state.items.filter((item) => item.status === "waiting" && isOpen(item) && isUserVisibleItem(item)).length} waiting`)
   );
 
   const touched = touchedTodayItems();
@@ -1411,11 +1694,10 @@ function renderDailyShutdown() {
 }
 
 function renderRecommendation() {
-  const [top, ...rest] = recommendedItems();
+  const [top] = recommendedItems();
   els.recommendationPanel.replaceChildren();
 
   if (!top) {
-    els.nextQueueList.replaceChildren(makeEmpty("Nothing queued"));
     const panel = document.createElement("article");
     panel.className = "now-card empty-now";
     const title = document.createElement("h3");
@@ -1465,22 +1747,24 @@ function renderRecommendation() {
   const stepMeta = document.createElement("p");
   stepMeta.className = "soft-copy";
   const doneSteps = item.steps.filter((step) => step.done).length;
-  stepMeta.textContent = `${item.estimate} min / ${doneSteps} of ${item.steps.length || 1} steps`;
+  stepMeta.textContent = isRhythm(item)
+    ? `${item.estimate} min minimum / ${cadenceMeta(item.cadence).label}${item.lastDone ? ` / last done ${formatDate(item.lastDone)}` : ""}`
+    : `${item.estimate} min / ${doneSteps} of ${item.steps.length || 1} steps`;
 
   const actions = document.createElement("div");
   actions.className = "now-actions";
-  actions.append(
-    createButton("Done", "primary-button", () => completeCurrentStep(item.id)),
-    createButton("Stuck", "secondary-button", () => openStuck(item.id)),
-    createButton("Snooze", "secondary-button", () => snoozeItem(item.id, "hour")),
-    createButton("Break down", "secondary-button", () => addBreakdown(item.id)),
-    createButton("Edit", "ghost-button", () => openEdit(item.id))
-  );
+  actions.append(createButton(isRhythm(item) ? "Done today" : "Done", "primary-button", () => completeCurrentStep(item.id)));
+  actions.append(createButton("Snooze", "secondary-button", () => snoozeItem(item.id, "hour")));
+  if (isProject(item)) {
+    actions.append(
+      createButton("Stuck", "secondary-button", () => openStuck(item.id)),
+      createButton("Break down", "secondary-button", () => addBreakdown(item.id))
+    );
+  }
+  actions.append(createButton("Edit", "ghost-button", () => openEdit(item.id)));
 
   panel.append(meta, title, reasonRow, tiny, progress, stepMeta, actions);
   els.recommendationPanel.append(panel);
-
-  renderMiniList(els.nextQueueList, rest.slice(0, 4).map((entry) => entry.item), "Nothing queued");
 }
 
 function makeMiniItem(item) {
@@ -1501,12 +1785,81 @@ function makeMiniItem(item) {
 }
 
 function renderMiniList(container, items, emptyText) {
+  if (!container) return;
   container.replaceChildren();
   if (!items.length) {
     container.append(makeEmpty(emptyText));
     return;
   }
   items.forEach((item) => container.append(makeMiniItem(item)));
+}
+
+function rhythmDueDays(item) {
+  const dueDays = daysUntil(item.nextDue);
+  return dueDays === null ? 9999 : dueDays;
+}
+
+function rhythmsDue(limit = 5) {
+  return sortedItems(state.items.filter((item) => {
+    if (!isRhythm(item) || item.system || !isOpen(item) || isSnoozed(item)) return false;
+    const dueDays = rhythmDueDays(item);
+    return dueDays <= 0 || item.status === "now" || item.status === "red";
+  })).slice(0, limit);
+}
+
+function renderRhythmsDue() {
+  if (!els.rhythmDueList) return;
+  els.rhythmDueList.replaceChildren();
+  const items = rhythmsDue();
+  if (!items.length) {
+    els.rhythmDueList.append(makeEmpty("No rhythms due"));
+    return;
+  }
+  items.forEach((item) => els.rhythmDueList.append(makeRhythmDueCard(item)));
+}
+
+function makeRhythmDueCard(item) {
+  const card = document.createElement("article");
+  card.className = `rhythm-card status-${item.status}`;
+
+  const top = document.createElement("div");
+  top.className = "rhythm-card-top";
+  const copy = document.createElement("div");
+  const meta = document.createElement("p");
+  meta.className = "item-meta";
+  const dueDays = rhythmDueDays(item);
+  const dueLabel = dueDays === 9999 ? "as needed" : dueDays < 0 ? `${Math.abs(dueDays)}d overdue` : dueDays === 0 ? "due today" : `due in ${dueDays}d`;
+  meta.textContent = [
+    cadenceMeta(item.cadence).label,
+    dueLabel,
+    item.lastDone ? `last ${formatDate(item.lastDone)}` : ""
+  ].filter(Boolean).join(" / ");
+  const title = document.createElement("h3");
+  title.textContent = item.title;
+  copy.append(meta, title);
+  const badge = document.createElement("span");
+  badge.className = "count-badge";
+  badge.textContent = dueDays < 0 ? "!" : "now";
+  top.append(copy, badge);
+
+  const minimum = document.createElement("div");
+  minimum.className = "tiny-start compact";
+  const minimumLabel = document.createElement("span");
+  minimumLabel.textContent = "Minimum";
+  const minimumText = document.createElement("strong");
+  minimumText.textContent = item.minimum || currentTinyStep(item);
+  minimum.append(minimumLabel, minimumText);
+
+  const actions = document.createElement("div");
+  actions.className = "rhythm-actions";
+  actions.append(
+    createButton("Done", "primary-button", () => completeRhythm(item.id)),
+    createButton("Snooze", "secondary-button", () => snoozeItem(item.id, "tomorrow")),
+    createButton("Edit", "ghost-button", () => openEdit(item.id))
+  );
+
+  card.append(top, minimum, actions);
+  return card;
 }
 
 function makeItemCard(item) {
@@ -1560,7 +1913,7 @@ function makeItemCard(item) {
 }
 
 function renderStats() {
-  const count = (status) => state.items.filter((item) => item.status === status).length;
+  const count = (status) => state.items.filter((item) => isUserVisibleItem(item) && item.status === status).length;
   els.redCount.textContent = count("red");
   els.inboxCount.textContent = count("inbox");
   els.waitingCount.textContent = count("waiting");
@@ -1605,7 +1958,7 @@ function renderMap() {
   const svg = els.mindMap;
   svg.replaceChildren();
 
-  const activeItems = state.items.filter((item) => isOpen(item));
+  const activeItems = state.items.filter((item) => isOpen(item) && isUserVisibleItem(item));
   const areaCounts = AREAS.map((area) => {
     const items = activeItems.filter((item) => item.area === area);
     return {
@@ -1718,8 +2071,8 @@ function truncate(text, length) {
 
 function reviewItems() {
   return sortedItems(state.items.filter((item) => {
-    if (!isOpen(item)) return false;
-    const dueDays = daysUntil(item.due);
+    if (!isOpen(item) || !isUserVisibleItem(item)) return false;
+    const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
     const reviewDays = daysUntil(item.review);
     const touched = toDate(item.lastTouched || item.updatedAt || item.createdAt);
     const stale = touched ? (Date.now() - touched.getTime()) / 86400000 >= 7 : false;
@@ -1734,12 +2087,13 @@ function renderReview() {
 
 function renderRecurring() {
   els.recurringList.replaceChildren();
-  if (!state.recurring.length) {
+  const rhythms = sortedItems(state.items.filter((item) => isRhythm(item) && isUserVisibleItem(item)));
+  if (!rhythms.length) {
     els.recurringList.append(makeEmpty("No rhythm items"));
     return;
   }
 
-  state.recurring.forEach((item) => {
+  rhythms.forEach((item) => {
     const card = document.createElement("article");
     card.className = "recurring-card";
     const top = document.createElement("div");
@@ -1748,40 +2102,35 @@ function renderRecurring() {
     const title = document.createElement("h3");
     title.textContent = item.title;
     const detail = document.createElement("p");
-    detail.textContent = `${item.cadence} / ${item.trigger || "No trigger"} / ${item.minimum || "No minimum"}`;
+    detail.textContent = [
+      cadenceMeta(item.cadence).label,
+      item.nextDue ? `Due ${formatDate(item.nextDue)}` : "No due date",
+      item.trigger || "No trigger",
+      item.minimum || "No minimum"
+    ].join(" / ");
     copy.append(title, detail);
     const badge = document.createElement("span");
     badge.className = "count-badge";
-    badge.textContent = item.lastDone === todayIso() ? "ok" : "0";
+    badge.textContent = item.lastDone === todayIso() ? "ok" : rhythmDueDays(item) < 0 ? "!" : "0";
     top.append(copy, badge);
 
     const actions = document.createElement("div");
     actions.className = "recurring-actions";
     actions.append(
       createButton(item.lastDone === todayIso() ? "Done today" : "Mark done", "mini-button", () => {
-        item.lastDone = todayIso();
+        markRhythmDone(item);
         saveState();
         render();
       }),
       createButton("Make now", "mini-button", () => {
-        addItem({
-          title: item.title,
-          status: "now",
-          area: "Unsorted",
-          nextAction: item.minimum || "Open this for 5 minutes",
-          steps: [item.minimum || "Open this for 5 minutes"]
-        });
+        updateItem(item.id, { status: "now", snoozedUntil: "" });
         showView("now");
-      })
+      }),
+      createButton("Edit", "mini-button", () => openEdit(item.id))
     );
     card.append(top, actions);
     els.recurringList.append(card);
   });
-}
-
-function renderRedZone() {
-  const items = sortedItems(state.items.filter((item) => item.status === "red" && isOpen(item))).slice(0, 5);
-  renderMiniList(els.redZoneList, items, "No red items");
 }
 
 function populateSelect(select, options, selected) {
@@ -1793,8 +2142,10 @@ function populateSelect(select, options, selected) {
 }
 
 function populateFormSelects() {
+  populateSelect(els.editKind, ITEM_KINDS, "project");
   populateSelect(els.editArea, AREAS, "Unsorted");
   populateSelect(els.editStatus, STATUSES, "inbox");
+  populateSelect(els.editCadence, CADENCES, "weekly");
   populateSelect(els.editImportance, [1, 2, 3, 4, 5].map((n) => ({ id: String(n), label: String(n) })), "3");
   populateSelect(els.editDread, [1, 2, 3, 4, 5].map((n) => ({ id: String(n), label: String(n) })), "3");
   populateSelect(els.editEstimate, ESTIMATES.map((n) => ({ id: String(n), label: `${n} min` })), "10");
@@ -1814,6 +2165,7 @@ function openEdit(itemId) {
   els.editItemId.value = item.id;
   els.editDialogTitle.textContent = item.title;
   els.editTitle.value = item.title;
+  els.editKind.value = item.kind;
   els.editArea.value = item.area;
   els.editStatus.value = item.status;
   els.editDue.value = item.due;
@@ -1822,6 +2174,9 @@ function openEdit(itemId) {
   els.editDread.value = String(item.dread);
   els.editEstimate.value = String(item.estimate);
   els.editWaitingFor.value = item.waitingFor;
+  els.editCadence.value = item.cadence || "weekly";
+  els.editTrigger.value = item.trigger || "";
+  els.editMinimum.value = item.minimum || "";
   els.editNextAction.value = item.nextAction;
   els.editConsequence.value = item.consequence;
   els.editNotes.value = item.notes;
@@ -1858,16 +2213,23 @@ function saveEdit(event) {
   const id = els.editItemId.value;
   if (!id) return;
   updateItem(id, {
+    kind: normalizeKind(els.editKind.value),
     title: els.editTitle.value.trim() || "Untitled",
     area: els.editArea.value,
     status: els.editStatus.value,
     due: els.editDue.value,
     review: els.editReview.value,
+    cadence: normalizeKind(els.editKind.value) === "rhythm" ? els.editCadence.value : "",
+    trigger: normalizeKind(els.editKind.value) === "rhythm" ? els.editTrigger.value.trim() : "",
+    minimum: normalizeKind(els.editKind.value) === "rhythm" ? els.editMinimum.value.trim() || els.editNextAction.value.trim() : "",
+    nextDue: normalizeKind(els.editKind.value) === "rhythm"
+      ? nextRhythmDue(getItem(id)?.lastDone || "", els.editCadence.value)
+      : "",
     importance: Number(els.editImportance.value),
     dread: Number(els.editDread.value),
     estimate: Number(els.editEstimate.value),
     waitingFor: els.editWaitingFor.value.trim(),
-    nextAction: els.editNextAction.value.trim(),
+    nextAction: els.editNextAction.value.trim() || (normalizeKind(els.editKind.value) === "rhythm" ? els.editMinimum.value.trim() : ""),
     consequence: els.editConsequence.value.trim(),
     notes: els.editNotes.value.trim()
   });
@@ -1937,22 +2299,23 @@ function handleStuckAction(action) {
 }
 
 function addRecurring() {
-  const title = prompt("Recurring item name");
+  const title = prompt("Rhythm name");
   if (!title || !title.trim()) return;
   const cadence = prompt("Cadence", "Weekly") || "Weekly";
   const trigger = prompt("Trigger", "Chosen day/time") || "";
   const minimum = prompt("Minimum version", "Touch it for 5 minutes") || "";
 
-  state.recurring.unshift({
-    id: cryptoId(),
+  addItem({
+    kind: "rhythm",
     title: title.trim(),
-    cadence: cadence.trim(),
+    status: "active",
+    area: "Unsorted",
+    cadence: normalizeCadence(cadence),
     trigger: trigger.trim(),
     minimum: minimum.trim(),
-    lastDone: ""
+    nextAction: minimum.trim() || "Touch it for 5 minutes",
+    steps: [minimum.trim() || "Touch it for 5 minutes"]
   });
-  saveState();
-  render();
 }
 
 function exportData() {
@@ -2034,7 +2397,7 @@ function bindEvents() {
     render();
   });
 
-  els.addRecurringButton.addEventListener("click", addRecurring);
+  els.addRhythmButtons.forEach((button) => button.addEventListener("click", addRecurring));
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", () => {
@@ -2075,7 +2438,7 @@ function render() {
   renderWizard();
   renderDailyLoop();
   renderRecommendation();
-  renderRedZone();
+  renderRhythmsDue();
   renderAreaFilter();
   renderStatusFilters();
   renderProjects();
