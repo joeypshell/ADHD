@@ -30,6 +30,7 @@ const DEFAULT_DATA = {
   createdAt: new Date().toISOString(),
   lastReviewed: "",
   filter: { area: "all", status: "" },
+  todayPlan: createDailyPlan(),
   items: [],
   recurring: [
     {
@@ -121,6 +122,8 @@ const els = {
   todayLabel: document.querySelector("#todayLabel"),
   quickCaptureForm: document.querySelector("#quickCaptureForm"),
   quickCaptureInput: document.querySelector("#quickCaptureInput"),
+  dailyLaunchPanel: document.querySelector("#dailyLaunchPanel"),
+  dailyShutdownPanel: document.querySelector("#dailyShutdownPanel"),
   recommendationPanel: document.querySelector("#recommendationPanel"),
   refreshNowButton: document.querySelector("#refreshNowButton"),
   exportButton: document.querySelector("#exportButton"),
@@ -203,6 +206,18 @@ function dateOffset(days) {
   return date.toISOString().slice(0, 10);
 }
 
+function createDailyPlan(date = todayIso()) {
+  return {
+    date,
+    launchedAt: "",
+    shutdownAt: "",
+    anchorItemId: "",
+    backupItemId: "",
+    minimumText: "",
+    shutdownNote: ""
+  };
+}
+
 function tomorrowAt(hour) {
   const date = new Date();
   date.setDate(date.getDate() + 1);
@@ -262,6 +277,7 @@ function normalizeData(data) {
     ...data,
     version: 2,
     filter: { area: "all", status: "", ...(data.filter || {}) },
+    todayPlan: normalizeDailyPlan(data.todayPlan),
     items: Array.isArray(data.items) ? data.items : [],
     recurring: Array.isArray(data.recurring) ? data.recurring : DEFAULT_DATA.recurring
   };
@@ -308,6 +324,29 @@ function normalizeData(data) {
   }));
 
   return normalized;
+}
+
+function normalizeDailyPlan(plan = {}) {
+  const today = todayIso();
+  const sameDay = plan && plan.date === today;
+  if (!sameDay) return createDailyPlan(today);
+
+  return {
+    date: today,
+    launchedAt: plan.launchedAt || "",
+    shutdownAt: plan.shutdownAt || "",
+    anchorItemId: plan.anchorItemId || "",
+    backupItemId: plan.backupItemId || "",
+    minimumText: plan.minimumText || "",
+    shutdownNote: plan.shutdownNote || ""
+  };
+}
+
+function ensureTodayPlan() {
+  const current = normalizeDailyPlan(state.todayPlan);
+  if (JSON.stringify(current) === JSON.stringify(state.todayPlan)) return;
+  state.todayPlan = current;
+  saveState();
 }
 
 function normalizeStatus(status) {
@@ -1083,6 +1122,294 @@ function makeChip(text, variant = "") {
   return chip;
 }
 
+function findOpenItem(id) {
+  const item = getItem(id);
+  return item && isOpen(item) && !isSnoozed(item) ? item : null;
+}
+
+function dailyMinimumText(item) {
+  if (!item) return "Open the Wizard and add one loose thing";
+  if (item.dread >= 4 || item.estimate > 15) return `Open "${item.title}" for 5 minutes`;
+  return currentTinyStep(item);
+}
+
+function dailyPicks() {
+  const entries = recommendedItems();
+  const anchor = findOpenItem(state.todayPlan.anchorItemId) || entries[0]?.item || null;
+  const storedBackup = findOpenItem(state.todayPlan.backupItemId);
+  const backup = storedBackup && (!anchor || storedBackup.id !== anchor.id)
+    ? storedBackup
+    : entries.find((entry) => !anchor || entry.item.id !== anchor.id)?.item || null;
+
+  return {
+    anchor,
+    backup,
+    minimumText: state.todayPlan.minimumText || dailyMinimumText(anchor)
+  };
+}
+
+function markRecurringDone(title) {
+  const item = state.recurring.find((entry) => entry.title.toLowerCase() === title.toLowerCase());
+  if (item) item.lastDone = todayIso();
+}
+
+function promoteItemToNow(item) {
+  if (!item) return;
+  const now = new Date().toISOString();
+  item.status = "now";
+  item.snoozedUntil = "";
+  item.updatedAt = now;
+  item.lastTouched = now;
+}
+
+function startDailyLaunch() {
+  const picks = dailyPicks();
+  state.todayPlan = {
+    ...createDailyPlan(),
+    launchedAt: new Date().toISOString(),
+    anchorItemId: picks.anchor?.id || "",
+    backupItemId: picks.backup?.id || "",
+    minimumText: picks.minimumText
+  };
+  markRecurringDone("Daily launch");
+  promoteItemToNow(picks.anchor);
+  saveState();
+  render();
+}
+
+function replanDailyLaunch() {
+  const entries = recommendedItems();
+  const anchor = entries[0]?.item || null;
+  const backup = entries.find((entry) => !anchor || entry.item.id !== anchor.id)?.item || null;
+  state.todayPlan = {
+    ...normalizeDailyPlan(state.todayPlan),
+    anchorItemId: anchor?.id || "",
+    backupItemId: backup?.id || "",
+    minimumText: dailyMinimumText(anchor),
+    shutdownAt: ""
+  };
+  promoteItemToNow(anchor);
+  saveState();
+  render();
+}
+
+function useBackupAsAnchor() {
+  const backup = findOpenItem(state.todayPlan.backupItemId);
+  if (!backup) {
+    replanDailyLaunch();
+    return;
+  }
+  const nextBackup = recommendedItems().find((entry) => entry.item.id !== backup.id)?.item || null;
+  state.todayPlan = {
+    ...normalizeDailyPlan(state.todayPlan),
+    anchorItemId: backup.id,
+    backupItemId: nextBackup?.id || "",
+    minimumText: dailyMinimumText(backup),
+    shutdownAt: ""
+  };
+  promoteItemToNow(backup);
+  saveState();
+  render();
+}
+
+function clearDailyLaunch() {
+  state.todayPlan = createDailyPlan();
+  saveState();
+  render();
+}
+
+function closeDailyShutdown() {
+  state.todayPlan = {
+    ...normalizeDailyPlan(state.todayPlan),
+    shutdownAt: new Date().toISOString()
+  };
+  state.lastReviewed = new Date().toISOString();
+  markRecurringDone("Shutdown");
+  saveState();
+  render();
+}
+
+function reopenDailyShutdown() {
+  state.todayPlan = {
+    ...normalizeDailyPlan(state.todayPlan),
+    shutdownAt: ""
+  };
+  saveState();
+  render();
+}
+
+function touchedTodayItems() {
+  const today = todayIso();
+  return sortedItems(state.items.filter((item) => {
+    if (!isOpen(item)) return false;
+    return [item.lastTouched, item.updatedAt].some((value) => String(value || "").startsWith(today));
+  })).slice(0, 3);
+}
+
+function dailyPickRow(label, item, fallback) {
+  const row = document.createElement("div");
+  row.className = "daily-pick-row";
+  const tag = document.createElement("span");
+  tag.className = "daily-pick-label";
+  tag.textContent = label;
+  const title = document.createElement("strong");
+  title.className = "daily-pick-title";
+  title.textContent = item ? item.title : fallback;
+  const detail = document.createElement("p");
+  detail.textContent = item ? currentTinyStep(item) : "Nothing active is asking for attention yet.";
+  row.append(tag, title, detail);
+  return row;
+}
+
+function renderDailyLoop() {
+  renderDailyLaunch();
+  renderDailyShutdown();
+}
+
+function renderDailyLaunch() {
+  const picks = dailyPicks();
+  const launched = Boolean(state.todayPlan.launchedAt);
+  const card = document.createElement("article");
+  card.className = `daily-card launch-card${launched ? " is-active" : ""}`;
+
+  const header = document.createElement("div");
+  header.className = "daily-card-header";
+  const copy = document.createElement("div");
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = "Daily launch";
+  const title = document.createElement("h2");
+  title.textContent = launched ? "Today has a shape" : "Pick today's shape";
+  copy.append(eyebrow, title);
+  const badge = document.createElement("span");
+  badge.className = "count-badge";
+  badge.textContent = launched ? "ok" : "go";
+  header.append(copy, badge);
+
+  const lead = document.createElement("p");
+  lead.className = "soft-copy";
+  lead.textContent = launched
+    ? `Launched ${formatDateTime(state.todayPlan.launchedAt)}.`
+    : "Choose one anchor, one backup, and one minimum viable day.";
+
+  const pickList = document.createElement("div");
+  pickList.className = "daily-picks";
+  pickList.append(
+    dailyPickRow("Anchor", picks.anchor, "No anchor yet"),
+    dailyPickRow("Backup", picks.backup, "No backup yet"),
+    dailyPickRow("Minimum viable day", null, picks.minimumText)
+  );
+  pickList.lastElementChild.querySelector("p").textContent = "This counts if the day gets weird.";
+
+  const actions = document.createElement("div");
+  actions.className = "daily-actions";
+  if (!launched) {
+    actions.append(
+      createButton("Start day", "primary-button", startDailyLaunch),
+      createButton("Wizard", "secondary-button", () => showView("wizard"))
+    );
+  } else {
+    if (picks.anchor) actions.append(createButton("Anchor done", "primary-button", () => completeCurrentStep(picks.anchor.id)));
+    if (picks.backup) actions.append(createButton("Use backup", "secondary-button", useBackupAsAnchor));
+    actions.append(
+      createButton("Plan again", "secondary-button", replanDailyLaunch),
+      createButton("Clear", "ghost-button", clearDailyLaunch)
+    );
+  }
+
+  card.append(header, lead, pickList, actions);
+  els.dailyLaunchPanel.replaceChildren(card);
+}
+
+function renderDailyShutdown() {
+  const launched = Boolean(state.todayPlan.launchedAt);
+  const closed = Boolean(state.todayPlan.shutdownAt);
+  const card = document.createElement("article");
+  card.className = `daily-card shutdown-card${closed ? " is-closed" : ""}`;
+
+  const header = document.createElement("div");
+  header.className = "daily-card-header";
+  const copy = document.createElement("div");
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = "Shutdown";
+  const title = document.createElement("h2");
+  title.textContent = closed ? "Day is closed" : "Close the loops";
+  copy.append(eyebrow, title);
+  const badge = document.createElement("span");
+  badge.className = "count-badge";
+  badge.textContent = closed ? "ok" : "end";
+  header.append(copy, badge);
+
+  const counts = document.createElement("div");
+  counts.className = "daily-metrics";
+  counts.append(
+    makeChip(`${reviewItems().length} review`),
+    makeChip(`${state.items.filter((item) => item.status === "red" && isOpen(item)).length} red`),
+    makeChip(`${state.items.filter((item) => item.status === "waiting" && isOpen(item)).length} waiting`)
+  );
+
+  const touched = touchedTodayItems();
+  const touchedList = document.createElement("div");
+  touchedList.className = "daily-touched";
+  const touchedLabel = document.createElement("span");
+  touchedLabel.className = "daily-pick-label";
+  touchedLabel.textContent = "Touched today";
+  touchedList.append(touchedLabel);
+  if (touched.length) {
+    touched.forEach((item) => {
+      const line = document.createElement("p");
+      line.textContent = `${item.title} / ${currentTinyStep(item)}`;
+      touchedList.append(line);
+    });
+  } else {
+    const empty = document.createElement("p");
+    empty.textContent = "Nothing touched yet.";
+    touchedList.append(empty);
+  }
+
+  const label = document.createElement("label");
+  label.className = "daily-note";
+  label.textContent = "What changed?";
+  const textarea = document.createElement("textarea");
+  textarea.rows = 3;
+  textarea.placeholder = "Done, blocked, scary, waiting, or tomorrow";
+  textarea.value = state.todayPlan.shutdownNote || "";
+  textarea.addEventListener("input", () => {
+    state.todayPlan.shutdownNote = textarea.value;
+    saveState();
+  });
+  label.append(textarea);
+
+  const actions = document.createElement("div");
+  actions.className = "daily-actions";
+  if (!launched) {
+    const copy = document.createElement("p");
+    copy.className = "soft-copy";
+    copy.textContent = "Start the daily launch first; shutdown becomes useful after the day has an anchor.";
+    actions.append(createButton("Start day", "primary-button", startDailyLaunch));
+    card.append(header, copy, actions);
+    els.dailyShutdownPanel.replaceChildren(card);
+    return;
+  }
+
+  if (closed) {
+    const closedCopy = document.createElement("p");
+    closedCopy.className = "soft-copy";
+    closedCopy.textContent = `Closed ${formatDateTime(state.todayPlan.shutdownAt)}.`;
+    actions.append(createButton("Reopen", "secondary-button", reopenDailyShutdown));
+    card.append(header, closedCopy, counts, touchedList, label, actions);
+  } else {
+    actions.append(
+      createButton("Close today", "primary-button", closeDailyShutdown),
+      createButton("Review", "secondary-button", () => showView("review"))
+    );
+    card.append(header, counts, touchedList, label, actions);
+  }
+
+  els.dailyShutdownPanel.replaceChildren(card);
+}
+
 function renderRecommendation() {
   const [top, ...rest] = recommendedItems();
   els.recommendationPanel.replaceChildren();
@@ -1743,8 +2070,10 @@ function bindEvents() {
 }
 
 function render() {
+  ensureTodayPlan();
   renderStats();
   renderWizard();
+  renderDailyLoop();
   renderRecommendation();
   renderRedZone();
   renderAreaFilter();

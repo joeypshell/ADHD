@@ -249,6 +249,117 @@ textarea {
   margin-bottom: 14px;
 }
 
+.daily-loop {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.daily-card {
+  display: grid;
+  gap: 12px;
+  min-height: 100%;
+  padding: clamp(14px, 3vw, 18px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--green);
+  border-radius: var(--radius);
+  box-shadow: 0 14px 34px rgba(23, 33, 31, 0.07);
+}
+
+.daily-card.shutdown-card {
+  border-left-color: var(--violet);
+}
+
+.daily-card.is-closed {
+  border-left-color: var(--green);
+}
+
+.daily-card-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.daily-card h2 {
+  margin: 0;
+  font-size: clamp(1.05rem, 3vw, 1.35rem);
+  line-height: 1.1;
+}
+
+.daily-picks,
+.daily-touched {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.daily-pick-row,
+.daily-touched p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 10px 0;
+  border-top: 1px solid #edf1ec;
+}
+
+.daily-pick-row:first-child,
+.daily-touched p:first-of-type {
+  border-top: 0;
+}
+
+.daily-pick-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.daily-pick-title {
+  font-size: 1rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.daily-pick-row p,
+.daily-touched p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.32;
+  overflow-wrap: anywhere;
+}
+
+.daily-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.daily-note {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.daily-note textarea {
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.daily-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .now-card,
 .item-card,
 .mini-item,
@@ -964,6 +1075,7 @@ dialog::backdrop {
 }
 
 @media (max-width: 860px) {
+  .daily-loop,
   .cockpit-grid,
   .review-grid,
   .item-form,
@@ -1011,8 +1123,11 @@ dialog::backdrop {
 
   .now-actions .primary-button,
   .now-actions .secondary-button,
-  .now-actions .ghost-button {
-  flex: 1 1 112px;
+  .now-actions .ghost-button,
+  .daily-actions .primary-button,
+  .daily-actions .secondary-button,
+  .daily-actions .ghost-button {
+    flex: 1 1 112px;
   }
 
   .bottom-nav {

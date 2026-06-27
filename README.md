@@ -2,7 +2,15 @@
 
 A static, mobile-first command center for ADHD-style executive function support. It is built for GitHub Pages and runs without a build step.
 
-The primary screen is a Now cockpit: it recommends one next action using local priority rules for due dates, consequences, importance, dread, waiting checkbacks, stale items, and snoozes. Projects, map, wizard, and review are secondary views over the same data.
+The primary screen is a Now cockpit: it runs a Daily Launch / Shutdown loop and recommends one next action using local priority rules for due dates, consequences, importance, dread, waiting checkbacks, stale items, and snoozes. Projects, map, wizard, and review are secondary views over the same data.
+
+Daily Launch gives the day a shape:
+
+- Anchor task
+- Backup task
+- Minimum viable day
+
+Shutdown captures what changed, shows open-loop counts, and marks the daily rhythm complete.
 
 The Wizard tab guides task setup with three paths:
 
