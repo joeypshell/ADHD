@@ -1,23 +1,23 @@
 :root {
   color-scheme: light;
-  --paper: #f6f4ff;
+  --paper: #fbfaf6;
   --panel: #ffffff;
-  --ink: #17142b;
-  --muted: #67617f;
-  --line: #ded9f4;
-  --teal: #2658ff;
-  --teal-soft: #e7ecff;
-  --coral: #f34f64;
-  --coral-soft: #ffe4e8;
-  --gold: #c98300;
-  --gold-soft: #fff0bd;
-  --green: #008f5a;
-  --green-soft: #dcf7e8;
-  --violet: #7b3ff2;
-  --violet-soft: #eee7ff;
-  --lime: #b7e900;
-  --cyan: #00a7c7;
-  --shadow: 0 18px 45px rgba(23, 20, 43, 0.12);
+  --ink: #083d42;
+  --muted: #626569;
+  --line: #e4e0d8;
+  --teal: #004f56;
+  --teal-soft: #e5f3f1;
+  --coral: #e83f45;
+  --coral-soft: #ffe7e4;
+  --gold: #c48904;
+  --gold-soft: #fff1c7;
+  --green: #078d63;
+  --green-soft: #e1f3ea;
+  --violet: #5b4a86;
+  --violet-soft: #eeeaf7;
+  --lime: #98c90c;
+  --cyan: #0b78a0;
+  --shadow: 0 18px 44px rgba(19, 36, 34, 0.12);
   --radius: 8px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -36,8 +36,8 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    linear-gradient(135deg, rgba(38, 88, 255, 0.12), rgba(183, 233, 0, 0.1) 42%, rgba(246, 244, 255, 0) 68%),
-    linear-gradient(180deg, rgba(123, 63, 242, 0.08), rgba(246, 244, 255, 0) 330px),
+    linear-gradient(135deg, rgba(0, 79, 86, 0.08), rgba(251, 250, 246, 0) 42%),
+    linear-gradient(180deg, rgba(196, 137, 4, 0.08), rgba(251, 250, 246, 0) 300px),
     var(--paper);
 }
 
@@ -78,11 +78,13 @@ textarea {
 }
 
 .topbar {
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
   gap: 14px;
-  padding: 18px 0 14px;
+  padding: 18px 84px 22px;
+  text-align: center;
 }
 
 .topbar h1,
@@ -97,7 +99,9 @@ textarea {
 }
 
 .topbar h1 {
-  font-size: clamp(1.7rem, 6vw, 3rem);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.5rem, 9vw, 5rem);
+  font-weight: 850;
   line-height: 1;
 }
 
@@ -110,6 +114,9 @@ textarea {
 }
 
 .topbar-actions {
+  position: absolute;
+  top: 18px;
+  right: 0;
   display: flex;
   flex-shrink: 0;
   gap: 8px;
@@ -205,12 +212,13 @@ textarea {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
-  margin-bottom: 16px;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.82);
+  width: min(620px, 100%);
+  margin: 12px auto 18px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.68);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 34px rgba(23, 33, 31, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(19, 36, 34, 0.06);
 }
 
 .quick-capture button {
@@ -221,6 +229,11 @@ textarea {
   border: 1px solid var(--teal);
   border-radius: var(--radius);
   font-weight: 850;
+}
+
+.quick-capture input {
+  border-color: transparent;
+  background: transparent;
 }
 
 .section-heading {
@@ -249,7 +262,11 @@ textarea {
 }
 
 .recommendation-shell {
-  margin-bottom: 14px;
+  margin-bottom: 18px;
+}
+
+.recommendation-shell > .section-heading {
+  display: none;
 }
 
 .rhythms-due-shell {
@@ -277,6 +294,40 @@ textarea {
 .daily-details[open] summary {
   margin-bottom: 10px;
   background: #fff;
+}
+
+.empty-wizard-prompt {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 18px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--green);
+  border-radius: 20px;
+  box-shadow: 0 16px 34px rgba(19, 36, 34, 0.08);
+}
+
+.empty-wizard-prompt[hidden] {
+  display: none;
+}
+
+.empty-wizard-prompt h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.65rem, 6vw, 2.6rem);
+  line-height: 1.05;
+}
+
+.empty-wizard-prompt p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.view.is-empty > .section-heading {
+  display: none;
 }
 
 .daily-loop {
@@ -456,7 +507,34 @@ textarea {
 .now-card {
   display: grid;
   gap: 14px;
-  padding: clamp(16px, 4vw, 24px);
+  padding: clamp(74px, 12vw, 96px) clamp(18px, 4vw, 28px) clamp(18px, 4vw, 28px);
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 28px;
+  box-shadow: 0 18px 46px rgba(19, 36, 34, 0.14);
+}
+
+.now-card::before {
+  content: "Recommended next action";
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  min-height: 62px;
+  padding: 0 clamp(18px, 4vw, 28px);
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 45%),
+    var(--teal);
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.now-card.empty-now::before {
+  content: "Guided setup";
 }
 
 .now-card.status-red,
@@ -478,9 +556,33 @@ textarea {
 }
 
 .now-card h3 {
-  font-size: clamp(1.45rem, 5vw, 2.25rem);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 7vw, 3.2rem);
   line-height: 1.05;
   overflow-wrap: anywhere;
+}
+
+.now-actions .primary-button,
+.now-actions .secondary-button,
+.now-actions .ghost-button {
+  min-height: 58px;
+  border-radius: 18px;
+  font-size: 1rem;
+}
+
+.now-actions .primary-button {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.now-actions .secondary-button {
+  background: #fff8f1;
+  border-color: #f1d7bf;
+}
+
+.now-actions .ghost-button {
+  background: var(--violet-soft);
+  border-color: #ddd4f0;
 }
 
 .item-meta,
@@ -1177,15 +1279,29 @@ dialog::backdrop {
   }
 
   .topbar {
-    align-items: flex-start;
+    justify-content: center;
+    padding: 18px 48px 18px;
+  }
+
+  .topbar h1 {
+    font-size: clamp(2.1rem, 8vw, 2.5rem);
+  }
+
+  .topbar-actions {
+    top: 16px;
+  }
+
+  .icon-button {
+    width: 40px;
+    min-height: 40px;
   }
 
   .quick-capture {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .quick-capture button {
-    width: 100%;
+    width: auto;
   }
 
   .stats-strip {

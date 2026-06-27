@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#17142b">
+    <meta name="theme-color" content="#083d42">
     <title>Life Command Center</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="styles.css">
@@ -24,12 +24,6 @@
 
       <main>
         <section class="view is-active" id="nowView" data-view-panel="now" aria-labelledby="nowTitle">
-          <form class="quick-capture" id="quickCaptureForm">
-            <label class="sr-only" for="quickCaptureInput">Capture a project</label>
-            <input id="quickCaptureInput" autocomplete="off" placeholder="Capture a project">
-            <button type="submit">Add</button>
-          </form>
-
           <section class="recommendation-shell" aria-labelledby="nowTitle">
             <div class="section-heading compact">
               <div>
@@ -41,7 +35,13 @@
             <div id="recommendationPanel"></div>
           </section>
 
-          <section class="rhythms-due-shell" aria-labelledby="rhythmsDueTitle">
+          <form class="quick-capture" id="quickCaptureForm">
+            <label class="sr-only" for="quickCaptureInput">Capture a loose thing</label>
+            <input id="quickCaptureInput" autocomplete="off" placeholder="Capture a loose thing">
+            <button type="submit">Add</button>
+          </form>
+
+          <section class="rhythms-due-shell" id="rhythmDueShell" aria-labelledby="rhythmsDueTitle">
             <div class="section-heading compact">
               <div>
                 <p class="eyebrow">Life rails</p>
@@ -69,6 +69,11 @@
             </div>
             <button class="secondary-button" id="resetWizardButton" type="button">Reset</button>
           </div>
+          <section class="empty-wizard-prompt" id="emptyWizardPrompt" hidden>
+            <p class="eyebrow">Nothing active</p>
+            <h3>Looks like you have nothing active yet.</h3>
+            <p>Add one project or rhythm and I will turn it into the next small step.</p>
+          </section>
           <section class="wizard-card" aria-live="polite">
             <div class="wizard-progress">
               <div>

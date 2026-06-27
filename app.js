@@ -57,36 +57,16 @@ const DEFAULT_RHYTHMS = [
     trigger: "End of workday or evening",
     minimum: "Update the open loops",
     system: true
-  },
-  {
-    title: "Weekly reset",
-    area: "Home / Admin",
-    cadence: "weekly",
-    trigger: "Chosen reset day",
-    minimum: "Review Red, Waiting, due dates"
-  },
-  {
-    title: "Clean kitchen",
-    area: "Home / Admin",
-    cadence: "daily",
-    trigger: "After dinner or before bed",
-    minimum: "Clear one surface for 5 minutes"
-  },
-  {
-    title: "Get gas",
-    area: "Home / Admin",
-    cadence: "weekly",
-    trigger: "When fuel is under half",
-    minimum: "Check fuel level"
-  },
-  {
-    title: "Work out",
-    area: "Body / Exercise",
-    cadence: "daily",
-    trigger: "Before the day starts",
-    minimum: "Start the warmup"
   }
 ];
+
+const STARTER_RHYTHM_TITLES = new Set([
+  "weekly reset",
+  "clean kitchen",
+  "get gas",
+  "work out",
+  "monthly audit"
+]);
 
 const DEFAULT_DATA = {
   version: 3,
@@ -155,6 +135,7 @@ const STEP_SUGGESTIONS = {
 let state = loadState();
 let stuckItemId = "";
 let wizard = createWizardState("project");
+let emptyWizardAutoOpened = false;
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -173,8 +154,11 @@ const els = {
   inboxCount: document.querySelector("#inboxCount"),
   waitingCount: document.querySelector("#waitingCount"),
   activeCount: document.querySelector("#activeCount"),
+  rhythmDueShell: document.querySelector("#rhythmDueShell"),
   rhythmDueList: document.querySelector("#rhythmDueList"),
+  wizardView: document.querySelector("#wizardView"),
   resetWizardButton: document.querySelector("#resetWizardButton"),
+  emptyWizardPrompt: document.querySelector("#emptyWizardPrompt"),
   wizardModeLabel: document.querySelector("#wizardModeLabel"),
   wizardStepTitle: document.querySelector("#wizardStepTitle"),
   wizardStepCount: document.querySelector("#wizardStepCount"),
@@ -297,10 +281,11 @@ function createRhythmItem(input = {}) {
   const minimum = input.minimum || input.nextAction || "Do the minimum version";
   const cadence = normalizeCadence(input.cadence || "weekly");
   const lastDone = input.lastDone || "";
+  const title = String(input.title || "Recurring rhythm").trim();
   return {
     id: input.id || cryptoId(),
     kind: "rhythm",
-    title: String(input.title || "Recurring rhythm").trim(),
+    title,
     area: AREAS.includes(input.area) ? input.area : "Unsorted",
     status: normalizeStatus(input.status || "active"),
     due: "",
@@ -318,6 +303,7 @@ function createRhythmItem(input = {}) {
     waitingFor: input.waitingFor || "",
     notes: input.notes || "",
     system: Boolean(input.system),
+    starter: Boolean(input.starter),
     createdAt: input.createdAt || new Date().toISOString(),
     updatedAt: input.updatedAt || new Date().toISOString(),
     lastTouched: input.lastTouched || input.updatedAt || input.createdAt || "",
@@ -457,13 +443,19 @@ function normalizeRhythmItem(item) {
   const minimum = item.minimum || item.nextAction || "Do the minimum version";
   const cadence = normalizeCadence(item.cadence || "weekly");
   const lastDone = item.lastDone || "";
+  const title = String(item.title || "Recurring rhythm").trim();
+  const untouchedStarter = STARTER_RHYTHM_TITLES.has(title.toLowerCase())
+    && !item.lastDone
+    && !item.notes
+    && !item.waitingFor
+    && !item.snoozeCount;
   const steps = normalizeStepObjects(item.steps);
   if (!steps.length) steps.push({ id: cryptoId(), text: minimum, done: false });
 
   return {
     id: item.id || cryptoId(),
     kind: "rhythm",
-    title: String(item.title || "Recurring rhythm").trim(),
+    title,
     area: AREAS.includes(item.area) ? item.area : "Unsorted",
     status: normalizeStatus(item.status || "active"),
     due: "",
@@ -481,6 +473,7 @@ function normalizeRhythmItem(item) {
     waitingFor: item.waitingFor || "",
     notes: item.notes || "",
     system: Boolean(item.system),
+    starter: Boolean(item.starter) || untouchedStarter,
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || new Date().toISOString(),
     lastTouched: item.lastTouched || item.updatedAt || item.createdAt || "",
@@ -675,6 +668,9 @@ function wizardStepTitle(step) {
 
 function renderWizard() {
   if (!els.wizardBody) return;
+  const empty = !hasActiveVisibleItems();
+  if (els.emptyWizardPrompt) els.emptyWizardPrompt.hidden = !empty;
+  if (els.wizardView) els.wizardView.classList.toggle("is-empty", empty);
   const steps = currentWizardSteps();
   const step = currentWizardStep();
   const progress = Math.round(((wizard.stepIndex + 1) / steps.length) * 100);
@@ -1258,7 +1254,16 @@ function isOpen(item) {
 }
 
 function isUserVisibleItem(item) {
-  return !item.system;
+  return !item.system && !item.starter;
+}
+
+function hasActiveVisibleItems() {
+  return state.items.some((item) => isUserVisibleItem(item) && isOpen(item));
+}
+
+function currentView() {
+  const active = Array.from(els.views).find((panel) => panel.classList.contains("is-active"));
+  return active?.dataset.viewPanel || "now";
 }
 
 function itemProgress(item) {
@@ -1761,7 +1766,6 @@ function renderRecommendation() {
       createButton("Break down", "secondary-button", () => addBreakdown(item.id))
     );
   }
-  actions.append(createButton("Edit", "ghost-button", () => openEdit(item.id)));
 
   panel.append(meta, title, reasonRow, tiny, progress, stepMeta, actions);
   els.recommendationPanel.append(panel);
@@ -1811,8 +1815,8 @@ function renderRhythmsDue() {
   if (!els.rhythmDueList) return;
   els.rhythmDueList.replaceChildren();
   const items = rhythmsDue();
+  if (els.rhythmDueShell) els.rhythmDueShell.hidden = !items.length;
   if (!items.length) {
-    els.rhythmDueList.append(makeEmpty("No rhythms due"));
     return;
   }
   items.forEach((item) => els.rhythmDueList.append(makeRhythmDueCard(item)));
@@ -2350,6 +2354,17 @@ function showView(view) {
   els.views.forEach((panel) => panel.classList.toggle("is-active", panel.dataset.viewPanel === view));
 }
 
+function maybeOpenEmptyWizard() {
+  if (hasActiveVisibleItems()) {
+    emptyWizardAutoOpened = false;
+    return;
+  }
+  if (emptyWizardAutoOpened || currentView() !== "now") return;
+  emptyWizardAutoOpened = true;
+  resetWizard("project");
+  showView("wizard");
+}
+
 function bindEvents() {
   els.todayLabel.textContent = new Intl.DateTimeFormat(undefined, {
     weekday: "long",
@@ -2444,6 +2459,7 @@ function render() {
   renderProjects();
   renderMap();
   renderReview();
+  maybeOpenEmptyWizard();
 }
 
 populateFormSelects();

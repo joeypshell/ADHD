@@ -3,8 +3,8 @@
   "short_name": "Command Center",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f6f4ff",
-  "theme_color": "#17142b",
+  "background_color": "#fbfaf6",
+  "theme_color": "#083d42",
   "icons": [
     {
       "src": "icon.svg",
