@@ -41,10 +41,30 @@ const CADENCES = [
   { id: "asneeded", label: "As needed", days: null }
 ];
 
+const MODES = [
+  { id: "home", label: "Home" },
+  { id: "work", label: "Work" },
+  { id: "both", label: "Both" }
+];
+
+const DASHBOARD_MODES = MODES.filter((mode) => mode.id !== "both");
+
+const TIME_WINDOWS = [
+  { id: "anytime", label: "Anytime", shortLabel: "Anytime", start: null, end: null },
+  { id: "morning", label: "Morning", shortLabel: "Morning", start: 5 * 60, end: 11 * 60 },
+  { id: "midday", label: "Midday", shortLabel: "Midday", start: 11 * 60, end: 14 * 60 },
+  { id: "afternoon", label: "Afternoon", shortLabel: "Afternoon", start: 14 * 60, end: 17 * 60 },
+  { id: "evening", label: "Evening", shortLabel: "Evening", start: 17 * 60, end: 21 * 60 },
+  { id: "night", label: "Night", shortLabel: "Night", start: 21 * 60, end: 5 * 60 },
+  { id: "exact", label: "Exact time", shortLabel: "Exact", start: null, end: null }
+];
+
 const DEFAULT_RHYTHMS = [
   {
     title: "Daily launch",
     area: "Unsorted",
+    mode: "both",
+    timeWindow: "morning",
     cadence: "daily",
     trigger: "Before work or messages",
     minimum: "Pick one action",
@@ -53,6 +73,8 @@ const DEFAULT_RHYTHMS = [
   {
     title: "Shutdown",
     area: "Unsorted",
+    mode: "both",
+    timeWindow: "evening",
     cadence: "daily",
     trigger: "End of workday or evening",
     minimum: "Update the open loops",
@@ -69,9 +91,10 @@ const STARTER_RHYTHM_TITLES = new Set([
 ]);
 
 const DEFAULT_DATA = {
-  version: 3,
+  version: 4,
   createdAt: new Date().toISOString(),
   lastReviewed: "",
+  mode: "home",
   filter: { area: "all", status: "" },
   todayPlan: createDailyPlan(),
   items: DEFAULT_RHYTHMS.map((rhythm) => createRhythmItem(rhythm)),
@@ -82,19 +105,19 @@ const WIZARD_MODES = {
   project: {
     label: "Project",
     description: "A one-time thing with an endpoint, even if it has many steps.",
-    steps: ["mode", "title", "area", "done", "steps", "timing", "consequence", "tiny", "summary"],
+    steps: ["mode", "title", "context", "area", "done", "steps", "timing", "window", "consequence", "tiny", "summary"],
     defaults: { kind: "project", status: "active", importance: 3, dread: 3, estimate: 15 }
   },
   rhythm: {
     label: "Rhythm",
     description: "A recurring life rail that needs to come back forever.",
-    steps: ["mode", "title", "area", "cadence", "tiny", "summary"],
+    steps: ["mode", "title", "context", "area", "cadence", "window", "tiny", "summary"],
     defaults: { kind: "rhythm", status: "active", importance: 4, dread: 2, estimate: 5, cadence: "weekly" }
   },
   rescue: {
     label: "Rescue something scary",
     description: "For something late, avoided, embarrassing, or consequence-heavy.",
-    steps: ["mode", "title", "fear", "timing", "consequence", "tiny", "steps", "summary"],
+    steps: ["mode", "title", "context", "fear", "timing", "window", "consequence", "tiny", "steps", "summary"],
     defaults: { kind: "project", status: "red", importance: 5, dread: 5, estimate: 10 }
   }
 };
@@ -139,6 +162,10 @@ let emptyWizardAutoOpened = false;
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
+  todayModeLabel: document.querySelector("#todayModeLabel"),
+  todayWindowLabel: document.querySelector("#todayWindowLabel"),
+  todayQueueList: document.querySelector("#todayQueueList"),
+  modeButtons: document.querySelectorAll("[data-mode-option]"),
   quickCaptureForm: document.querySelector("#quickCaptureForm"),
   quickCaptureInput: document.querySelector("#quickCaptureInput"),
   dailyLaunchPanel: document.querySelector("#dailyLaunchPanel"),
@@ -186,6 +213,9 @@ const els = {
   editKind: document.querySelector("#editKind"),
   editArea: document.querySelector("#editArea"),
   editStatus: document.querySelector("#editStatus"),
+  editMode: document.querySelector("#editMode"),
+  editTimeWindow: document.querySelector("#editTimeWindow"),
+  editExactTime: document.querySelector("#editExactTime"),
   editDue: document.querySelector("#editDue"),
   editReview: document.querySelector("#editReview"),
   editImportance: document.querySelector("#editImportance"),
@@ -201,6 +231,11 @@ const els = {
   editStepsList: document.querySelector("#editStepsList"),
   editStepInput: document.querySelector("#editStepInput"),
   editStepAddButton: document.querySelector("#editStepAddButton"),
+  detailDialog: document.querySelector("#detailDialog"),
+  detailMeta: document.querySelector("#detailMeta"),
+  detailTitle: document.querySelector("#detailTitle"),
+  detailBody: document.querySelector("#detailBody"),
+  closeDetailButton: document.querySelector("#closeDetailButton"),
   deleteItemButton: document.querySelector("#deleteItemButton"),
   saveEditButton: document.querySelector("#saveEditButton"),
   stuckDialog: document.querySelector("#stuckDialog"),
@@ -247,6 +282,41 @@ function normalizeKind(kind) {
   return kind === "rhythm" ? "rhythm" : "project";
 }
 
+function modeFromArea(area) {
+  return area === "Work" ? "work" : "home";
+}
+
+function normalizeMode(mode, area = "Unsorted") {
+  const value = String(mode || "").toLowerCase().trim();
+  return MODES.some((entry) => entry.id === value) ? value : modeFromArea(area);
+}
+
+function dashboardMode() {
+  return DASHBOARD_MODES.some((mode) => mode.id === state.mode) ? state.mode : "home";
+}
+
+function modeMeta(mode = dashboardMode()) {
+  return MODES.find((entry) => entry.id === mode) || MODES[0];
+}
+
+function itemMatchesMode(item, mode = dashboardMode()) {
+  return item.mode === "both" || item.mode === mode;
+}
+
+function normalizeTimeWindow(windowId) {
+  const value = String(windowId || "").toLowerCase().trim();
+  return TIME_WINDOWS.some((entry) => entry.id === value) ? value : "anytime";
+}
+
+function timeWindowMeta(windowId) {
+  return TIME_WINDOWS.find((entry) => entry.id === normalizeTimeWindow(windowId)) || TIME_WINDOWS[0];
+}
+
+function normalizeExactTime(value) {
+  const text = String(value || "").trim();
+  return /^\d{2}:\d{2}$/.test(text) ? text : "";
+}
+
 function cadenceMeta(cadence) {
   return CADENCES.find((entry) => entry.id === normalizeCadence(cadence)) || CADENCES[2];
 }
@@ -287,6 +357,9 @@ function createRhythmItem(input = {}) {
     kind: "rhythm",
     title,
     area: AREAS.includes(input.area) ? input.area : "Unsorted",
+    mode: normalizeMode(input.mode, input.area),
+    timeWindow: normalizeTimeWindow(input.timeWindow),
+    exactTime: normalizeExactTime(input.exactTime),
     status: normalizeStatus(input.status || "active"),
     due: "",
     review: input.review || "",
@@ -372,6 +445,65 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+function minutesNow(date = new Date()) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function exactTimeMinutes(value) {
+  const exact = normalizeExactTime(value);
+  if (!exact) return null;
+  const [hours, minutes] = exact.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function isMinuteInWindow(minute, meta) {
+  if (meta.start === null || meta.end === null) return false;
+  if (meta.start < meta.end) return minute >= meta.start && minute < meta.end;
+  return minute >= meta.start || minute < meta.end;
+}
+
+function currentTimeWindowId(date = new Date()) {
+  const minute = minutesNow(date);
+  return TIME_WINDOWS.find((entry) => entry.start !== null && isMinuteInWindow(minute, entry))?.id || "anytime";
+}
+
+function timeWindowStatus(item, date = new Date()) {
+  const windowId = normalizeTimeWindow(item.timeWindow);
+  if (windowId === "anytime") return { state: "anytime", boost: 0, include: false, label: "Anytime" };
+
+  const now = minutesNow(date);
+  if (windowId === "exact") {
+    const exact = exactTimeMinutes(item.exactTime);
+    if (exact === null) return { state: "anytime", boost: 0, include: false, label: "Exact time" };
+    const diff = exact - now;
+    const label = `At ${item.exactTime}`;
+    if (Math.abs(diff) <= 30) return { state: "current", boost: 90, include: true, label };
+    if (diff > 0) return { state: "upcoming", boost: diff <= 180 ? 48 : 18, include: true, label };
+    if (diff < 0) return { state: "missed", boost: 26, include: true, label };
+    return { state: "future", boost: 12, include: false, label };
+  }
+
+  const meta = timeWindowMeta(windowId);
+  if (isMinuteInWindow(now, meta)) return { state: "current", boost: 70, include: true, label: meta.shortLabel };
+
+  const ordered = ["morning", "midday", "afternoon", "evening", "night"];
+  const current = currentTimeWindowId(date);
+  const itemIndex = ordered.indexOf(windowId);
+  const currentIndex = ordered.indexOf(current);
+  if (itemIndex === -1 || currentIndex === -1) return { state: "future", boost: 0, include: false, label: meta.shortLabel };
+  if (current === "night" && now < 5 * 60 && windowId !== "night") {
+    return { state: "upcoming", boost: 34, include: true, label: meta.shortLabel };
+  }
+  if (itemIndex > currentIndex) return { state: "upcoming", boost: 34, include: true, label: meta.shortLabel };
+  return { state: "missed", boost: 20, include: true, label: meta.shortLabel };
+}
+
+function formatTimeWindow(item) {
+  const meta = timeWindowMeta(item.timeWindow);
+  if (meta.id === "exact" && item.exactTime) return `At ${item.exactTime}`;
+  return meta.label;
+}
+
 function loadState() {
   const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
   if (!stored) return cloneData(DEFAULT_DATA);
@@ -392,7 +524,8 @@ function normalizeData(data) {
   const normalized = {
     ...cloneData(DEFAULT_DATA),
     ...data,
-    version: 3,
+    version: 4,
+    mode: DASHBOARD_MODES.some((mode) => mode.id === data.mode) ? data.mode : "home",
     filter: { area: "all", status: "", kind: "", ...(data.filter || {}) },
     todayPlan: normalizeDailyPlan(data.todayPlan),
     items: [...sourceItems, ...migratedRhythms],
@@ -414,6 +547,9 @@ function normalizeItem(item) {
     kind: "project",
     title: String(item.title || "Untitled").trim(),
     area: AREAS.includes(item.area) ? item.area : "Unsorted",
+    mode: normalizeMode(item.mode, item.area),
+    timeWindow: normalizeTimeWindow(item.timeWindow),
+    exactTime: normalizeExactTime(item.exactTime),
     status: normalizeStatus(item.status),
     due: item.due || "",
     review: item.review || "",
@@ -457,6 +593,9 @@ function normalizeRhythmItem(item) {
     kind: "rhythm",
     title,
     area: AREAS.includes(item.area) ? item.area : "Unsorted",
+    mode: normalizeMode(item.mode, item.area),
+    timeWindow: normalizeTimeWindow(item.timeWindow),
+    exactTime: normalizeExactTime(item.exactTime),
     status: normalizeStatus(item.status || "active"),
     due: "",
     review: item.review || "",
@@ -562,12 +701,16 @@ function deleteItem(id) {
 }
 
 function addItem(input) {
+  const defaultAction = input.nextAction || input.minimum || "Open this for 5 minutes";
   const item = normalizeData({
     items: [{
       id: cryptoId(),
       kind: input.kind || "project",
       title: input.title,
       area: input.area || "Unsorted",
+      mode: input.mode || dashboardMode(),
+      timeWindow: input.timeWindow || "anytime",
+      exactTime: input.exactTime || "",
       status: input.status || (input.kind === "rhythm" ? "active" : "inbox"),
       due: input.due || "",
       review: input.review || "",
@@ -577,7 +720,7 @@ function addItem(input) {
       lastDone: input.lastDone || "",
       nextDue: input.nextDue || "",
       consequence: input.consequence || "",
-      nextAction: input.nextAction || "",
+      nextAction: defaultAction,
       importance: input.importance || 3,
       dread: input.dread || 3,
       estimate: input.estimate || 10,
@@ -587,7 +730,7 @@ function addItem(input) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       lastTouched: "",
-      steps: normalizeSteps(input.steps || [], input.nextAction)
+      steps: normalizeSteps(input.steps || [], defaultAction)
     }]
   }).items[0];
 
@@ -613,6 +756,9 @@ function createWizardState(mode) {
     data: {
       title: "",
       area: "Unsorted",
+      mode: dashboardMode(),
+      timeWindow: "anytime",
+      exactTime: "",
       kind: meta.defaults.kind,
       status: meta.defaults.status,
       due: "",
@@ -652,9 +798,11 @@ function wizardStepTitle(step) {
   const titles = {
     mode: "Choose a path",
     title: "Name it",
+    context: "Home, work, or both?",
     area: "Where does it belong?",
     cadence: "How often does it repeat?",
     timing: "When does it matter?",
+    window: "When should this show up?",
     consequence: "Why does it matter?",
     waiting: "Is someone else involved?",
     tiny: "Find the tiny start",
@@ -693,9 +841,11 @@ function renderWizardStep(step) {
     prompt: "What should this be called?",
     placeholder: "Example: renew car sticker"
   });
+  if (step === "context") return renderWizardContext();
   if (step === "area") return renderWizardArea();
   if (step === "cadence") return renderWizardCadence();
   if (step === "timing") return renderWizardTiming();
+  if (step === "window") return renderWizardWindow();
   if (step === "consequence") return renderWizardConsequence();
   if (step === "waiting") return renderWizardWaiting();
   if (step === "tiny") return renderWizardTiny();
@@ -761,6 +911,22 @@ function renderWizardText({ key, prompt, placeholder, multiline = false }) {
   });
   label.append(field);
   panel.append(label);
+  return panel;
+}
+
+function renderWizardContext() {
+  const panel = wizardPanel("Pick where this belongs. Both means it can appear on either dashboard.");
+  const grid = document.createElement("div");
+  grid.className = "wizard-chip-grid";
+  MODES.forEach((mode) => {
+    grid.append(makeWizardChoice(mode.label, wizard.data.mode === mode.id, () => {
+      wizard.data.mode = mode.id;
+      if (mode.id === "work" && wizard.data.area === "Unsorted") wizard.data.area = "Work";
+      if (mode.id === "home" && wizard.data.area === "Work") wizard.data.area = "Home / Admin";
+      renderWizard();
+    }));
+  });
+  panel.append(grid);
   return panel;
 }
 
@@ -849,6 +1015,33 @@ function renderWizardTiming() {
     wizard.data.review = value;
     renderWizard();
   }));
+  return panel;
+}
+
+function renderWizardWindow() {
+  const panel = wizardPanel("Choose when this should rise in the Today queue. It will still stay visible if the window passes.");
+  const grid = document.createElement("div");
+  grid.className = "wizard-chip-grid";
+  TIME_WINDOWS.forEach((windowOption) => {
+    grid.append(makeWizardChoice(windowOption.label, wizard.data.timeWindow === windowOption.id, () => {
+      wizard.data.timeWindow = windowOption.id;
+      renderWizard();
+    }));
+  });
+  panel.append(grid);
+
+  const label = document.createElement("label");
+  label.className = "wizard-field";
+  label.textContent = "Exact time";
+  const input = document.createElement("input");
+  input.type = "time";
+  input.value = wizard.data.exactTime;
+  input.addEventListener("input", () => {
+    wizard.data.exactTime = input.value;
+    if (input.value) wizard.data.timeWindow = "exact";
+  });
+  label.append(input);
+  panel.append(label);
   return panel;
 }
 
@@ -1011,6 +1204,8 @@ function renderWizardSummary() {
   meta.className = "item-meta";
   meta.textContent = [
     item.kind === "rhythm" ? "Rhythm" : "Project",
+    modeMeta(item.mode).label,
+    formatTimeWindow(item),
     item.area,
     statusLabel(item.status),
     item.cadence ? cadenceMeta(item.cadence).label : "",
@@ -1138,6 +1333,9 @@ function buildWizardItem() {
     kind: defaults.kind,
     title: wizard.data.title.trim() || (wizard.mode === "rhythm" ? "New rhythm" : "New project"),
     area: wizard.data.area || "Unsorted",
+    mode: wizard.data.mode || dashboardMode(),
+    timeWindow: wizard.data.timeWindow || "anytime",
+    exactTime: wizard.data.timeWindow === "exact" ? normalizeExactTime(wizard.data.exactTime) : "",
     status,
     due: wizard.mode === "rhythm" ? "" : wizard.data.due,
     review: wizard.mode === "rhythm" ? "" : wizard.data.review || (status === "waiting" ? dateOffset(2) : ""),
@@ -1324,6 +1522,7 @@ function recommendationReason(item) {
   const reasons = [];
   const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
   const reviewDays = daysUntil(item.review);
+  const window = timeWindowStatus(item);
 
   if (isRhythm(item)) reasons.push("rhythm");
   if (item.status === "red") reasons.push("red zone");
@@ -1334,6 +1533,7 @@ function recommendationReason(item) {
   }
   if (item.consequence.trim()) reasons.push(item.consequence.trim());
   if (item.waitingFor.trim() && reviewDays !== null && reviewDays <= 0) reasons.push("waiting checkback");
+  if (window.state !== "anytime") reasons.push(window.label);
   if (item.importance >= 4) reasons.push("high importance");
   if (item.snoozeCount > 0) reasons.push(`snoozed ${item.snoozeCount}x`);
   if (!reasons.length) reasons.push(item.area);
@@ -1341,9 +1541,68 @@ function recommendationReason(item) {
   return reasons.slice(0, 3);
 }
 
-function recommendedItems() {
+function isCreatedToday(item) {
+  return String(item.createdAt || "").startsWith(todayIso());
+}
+
+function todayCandidateReason(item) {
+  const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
+  const reviewDays = daysUntil(item.review);
+  const window = timeWindowStatus(item);
+  if (item.status === "now") return "marked now";
+  if (item.status === "red") return "red zone";
+  if (isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "rhythm overdue" : "rhythm due";
+  if (!isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "overdue" : "due today";
+  if (isCreatedToday(item)) return "captured today";
+  if (reviewDays !== null && reviewDays <= 0 && item.waitingFor.trim()) return "waiting checkback";
+  if (reviewDays !== null && reviewDays <= 0) return "review due";
+  if (window.include) return window.state === "missed" ? `${window.label} passed` : window.label;
+  return "";
+}
+
+function isTodayCandidate(item, mode = dashboardMode()) {
+  if (!isOpen(item) || isSnoozed(item) || !isUserVisibleItem(item) || !itemMatchesMode(item, mode)) return false;
+  return Boolean(todayCandidateReason(item));
+}
+
+function todayQueueScore(item) {
+  let score = scoreItem(item);
+  const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
+  const reviewDays = daysUntil(item.review);
+  const window = timeWindowStatus(item);
+
+  score += window.boost;
+  if (item.mode === "both") score += 4;
+  if (isRhythm(item) && dueDays !== null && dueDays <= 0) score += 50;
+  if (dueDays !== null && dueDays <= 0) score += dueDays < 0 ? 80 : 55;
+  if (reviewDays !== null && reviewDays <= 0) score += item.waitingFor.trim() ? 45 : 25;
+  if (isCreatedToday(item)) score += 18;
+  if (window.state === "current") score += 24;
+  if (window.state === "upcoming") score += 10;
+  if (window.state === "missed") score += 14;
+  return score;
+}
+
+function todayQueueEntries(limit = 8, mode = dashboardMode()) {
+  const entries = state.items
+    .filter((item) => isTodayCandidate(item, mode))
+    .map((item) => ({
+      item,
+      score: todayQueueScore(item),
+      reason: todayCandidateReason(item)
+    }))
+    .sort((a, b) => b.score - a.score || sortDateValue(a.item).localeCompare(sortDateValue(b.item)));
+
+  if (entries.length) return entries.slice(0, limit);
+
+  return recommendedItems(mode)
+    .slice(0, limit)
+    .map((entry) => ({ ...entry, reason: "next active" }));
+}
+
+function recommendedItems(mode = dashboardMode()) {
   return state.items
-    .filter((item) => isOpen(item) && !isSnoozed(item))
+    .filter((item) => isOpen(item) && !isSnoozed(item) && itemMatchesMode(item, mode))
     .map((item) => ({ item, score: scoreItem(item) }))
     .filter((entry) => entry.score > -9999)
     .sort((a, b) => b.score - a.score || sortDateValue(a.item).localeCompare(sortDateValue(b.item)));
@@ -1367,7 +1626,7 @@ function statusLabel(statusId) {
 }
 
 function itemMeta(item) {
-  const parts = [isRhythm(item) ? "Rhythm" : "Project", item.area, statusLabel(item.status)];
+  const parts = [isRhythm(item) ? "Rhythm" : "Project", modeMeta(item.mode).label, formatTimeWindow(item), item.area, statusLabel(item.status)];
   if (isRhythm(item)) {
     parts.push(cadenceMeta(item.cadence).label);
     if (item.nextDue) parts.push(`Due ${formatDate(item.nextDue)}`);
@@ -1380,6 +1639,7 @@ function itemMeta(item) {
 function visibleItems(items) {
   return items.filter((item) => {
     if (!isUserVisibleItem(item)) return false;
+    if (!itemMatchesMode(item)) return false;
     const areaOk = state.filter.area === "all" || item.area === state.filter.area;
     const statusOk = !state.filter.status || item.status === state.filter.status;
     const kindOk = !state.filter.kind || item.kind === state.filter.kind;
@@ -1550,6 +1810,7 @@ function dailyPickRow(label, item, fallback) {
 }
 
 function renderDailyLoop() {
+  if (!els.dailyLaunchPanel || !els.dailyShutdownPanel) return;
   renderDailyLaunch();
   renderDailyShutdown();
 }
@@ -1699,21 +1960,31 @@ function renderDailyShutdown() {
 }
 
 function renderRecommendation() {
-  const [top] = recommendedItems();
+  const entries = todayQueueEntries(8);
+  const [top] = entries;
+  if (els.todayModeLabel) els.todayModeLabel.textContent = `${modeMeta().label} mode`;
+  if (els.todayWindowLabel) {
+    const current = timeWindowMeta(currentTimeWindowId());
+    els.todayWindowLabel.textContent = `${current.label} window`;
+  }
+  els.modeButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.modeOption === dashboardMode()));
+  document.body.dataset.mode = dashboardMode();
   els.recommendationPanel.replaceChildren();
+  if (els.todayQueueList) els.todayQueueList.replaceChildren();
 
   if (!top) {
     const panel = document.createElement("article");
     panel.className = "now-card empty-now";
     const title = document.createElement("h3");
-    title.textContent = "Capture the next loose thing";
+    title.textContent = "Add the first thing for today";
     const copy = document.createElement("p");
-    copy.textContent = "No active item is asking for attention.";
+    copy.textContent = `No ${modeMeta().label.toLowerCase()} item is asking for attention yet.`;
     const actions = document.createElement("div");
     actions.className = "now-actions";
-    actions.append(createButton("Wizard", "primary-button", () => showView("wizard")));
+    actions.append(createButton("Add item", "primary-button", () => showView("wizard")));
     panel.append(title, copy, actions);
     els.recommendationPanel.append(panel);
+    if (els.todayQueueList) els.todayQueueList.append(makeEmpty("Nothing queued for this mode"));
     return;
   }
 
@@ -1723,7 +1994,7 @@ function renderRecommendation() {
 
   const meta = document.createElement("p");
   meta.className = "item-meta";
-  meta.textContent = itemMeta(item);
+  meta.textContent = [top.reason, itemMeta(item)].filter(Boolean).join(" / ");
 
   const title = document.createElement("h3");
   title.textContent = item.title;
@@ -1769,6 +2040,36 @@ function renderRecommendation() {
 
   panel.append(meta, title, reasonRow, tiny, progress, stepMeta, actions);
   els.recommendationPanel.append(panel);
+  if (els.todayQueueList) {
+    entries.forEach((entry, index) => els.todayQueueList.append(makeTodayQueueRow(entry, index)));
+  }
+}
+
+function makeTodayQueueRow(entry, index) {
+  const item = entry.item;
+  const row = document.createElement("button");
+  row.type = "button";
+  row.className = `today-queue-row status-${item.status}`;
+  row.addEventListener("click", () => openDetail(item.id));
+
+  const rank = document.createElement("span");
+  rank.className = "queue-rank";
+  rank.textContent = String(index + 1);
+
+  const copy = document.createElement("span");
+  copy.className = "queue-copy";
+  const title = document.createElement("strong");
+  title.textContent = item.title;
+  const detail = document.createElement("span");
+  detail.textContent = currentTinyStep(item);
+  copy.append(title, detail);
+
+  const meta = document.createElement("span");
+  meta.className = "queue-meta";
+  meta.textContent = [entry.reason, formatTimeWindow(item), `${item.estimate} min`].filter(Boolean).join(" / ");
+
+  row.append(rank, copy, meta);
+  return row;
 }
 
 function makeMiniItem(item) {
@@ -1805,7 +2106,7 @@ function rhythmDueDays(item) {
 
 function rhythmsDue(limit = 5) {
   return sortedItems(state.items.filter((item) => {
-    if (!isRhythm(item) || item.system || !isOpen(item) || isSnoozed(item)) return false;
+    if (!isRhythm(item) || item.system || !isOpen(item) || isSnoozed(item) || !itemMatchesMode(item)) return false;
     const dueDays = rhythmDueDays(item);
     return dueDays <= 0 || item.status === "now" || item.status === "red";
   })).slice(0, limit);
@@ -1917,7 +2218,7 @@ function makeItemCard(item) {
 }
 
 function renderStats() {
-  const count = (status) => state.items.filter((item) => isUserVisibleItem(item) && item.status === status).length;
+  const count = (status) => state.items.filter((item) => isUserVisibleItem(item) && itemMatchesMode(item) && item.status === status).length;
   els.redCount.textContent = count("red");
   els.inboxCount.textContent = count("inbox");
   els.waitingCount.textContent = count("waiting");
@@ -1962,7 +2263,7 @@ function renderMap() {
   const svg = els.mindMap;
   svg.replaceChildren();
 
-  const activeItems = state.items.filter((item) => isOpen(item) && isUserVisibleItem(item));
+  const activeItems = state.items.filter((item) => isOpen(item) && isUserVisibleItem(item) && itemMatchesMode(item));
   const areaCounts = AREAS.map((area) => {
     const items = activeItems.filter((item) => item.area === area);
     return {
@@ -2075,7 +2376,7 @@ function truncate(text, length) {
 
 function reviewItems() {
   return sortedItems(state.items.filter((item) => {
-    if (!isOpen(item) || !isUserVisibleItem(item)) return false;
+    if (!isOpen(item) || !isUserVisibleItem(item) || !itemMatchesMode(item)) return false;
     const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
     const reviewDays = daysUntil(item.review);
     const touched = toDate(item.lastTouched || item.updatedAt || item.createdAt);
@@ -2091,7 +2392,7 @@ function renderReview() {
 
 function renderRecurring() {
   els.recurringList.replaceChildren();
-  const rhythms = sortedItems(state.items.filter((item) => isRhythm(item) && isUserVisibleItem(item)));
+  const rhythms = sortedItems(state.items.filter((item) => isRhythm(item) && isUserVisibleItem(item) && itemMatchesMode(item)));
   if (!rhythms.length) {
     els.recurringList.append(makeEmpty("No rhythm items"));
     return;
@@ -2149,6 +2450,8 @@ function populateFormSelects() {
   populateSelect(els.editKind, ITEM_KINDS, "project");
   populateSelect(els.editArea, AREAS, "Unsorted");
   populateSelect(els.editStatus, STATUSES, "inbox");
+  populateSelect(els.editMode, MODES, "home");
+  populateSelect(els.editTimeWindow, TIME_WINDOWS, "anytime");
   populateSelect(els.editCadence, CADENCES, "weekly");
   populateSelect(els.editImportance, [1, 2, 3, 4, 5].map((n) => ({ id: String(n), label: String(n) })), "3");
   populateSelect(els.editDread, [1, 2, 3, 4, 5].map((n) => ({ id: String(n), label: String(n) })), "3");
@@ -2159,8 +2462,108 @@ function quickCapture(event) {
   event.preventDefault();
   const title = els.quickCaptureInput.value.trim();
   if (!title) return;
-  addItem({ title, status: "inbox", area: "Unsorted" });
+  addItem({
+    title,
+    status: "inbox",
+    area: dashboardMode() === "work" ? "Work" : "Unsorted",
+    mode: dashboardMode(),
+    review: todayIso()
+  });
   els.quickCaptureInput.value = "";
+}
+
+function openDetail(itemId) {
+  const item = getItem(itemId);
+  if (!item || !els.detailDialog) return;
+  renderDetail(item);
+  if (!els.detailDialog.open) els.detailDialog.showModal();
+}
+
+function renderDetail(item) {
+  els.detailMeta.textContent = itemMeta(item);
+  els.detailTitle.textContent = item.title;
+  els.detailBody.replaceChildren();
+
+  const summary = document.createElement("div");
+  summary.className = "detail-summary";
+  const reasonRow = document.createElement("div");
+  reasonRow.className = "reason-row";
+  recommendationReason(item).forEach((reason, index) => reasonRow.append(makeChip(reason, index === 0 ? "strong" : "")));
+  reasonRow.append(makeChip(`${item.estimate} min`));
+
+  const tiny = document.createElement("div");
+  tiny.className = "tiny-start";
+  const tinyLabel = document.createElement("span");
+  tinyLabel.textContent = isRhythm(item) ? "Minimum" : "Tiny start";
+  const tinyText = document.createElement("strong");
+  tinyText.textContent = currentTinyStep(item);
+  tiny.append(tinyLabel, tinyText);
+
+  const progress = document.createElement("div");
+  progress.className = "progress-line";
+  progress.setAttribute("aria-hidden", "true");
+  const progressBar = document.createElement("span");
+  progressBar.style.width = `${itemProgress(item)}%`;
+  progress.append(progressBar);
+  summary.append(reasonRow, tiny, progress);
+
+  const steps = document.createElement("div");
+  steps.className = "detail-steps";
+  const stepTitle = document.createElement("h3");
+  stepTitle.textContent = isRhythm(item) ? "Rhythm steps" : "Project steps";
+  const list = document.createElement("div");
+  list.className = "detail-step-list";
+  if (item.steps.length) {
+    item.steps.forEach((step) => {
+      const label = document.createElement("label");
+      label.className = `detail-step-row${step.done ? " is-done" : ""}`;
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = step.done;
+      checkbox.addEventListener("change", () => {
+        updateStep(item.id, step.id, { done: checkbox.checked });
+        const updated = getItem(item.id);
+        if (updated && els.detailDialog.open) renderDetail(updated);
+      });
+      const text = document.createElement("span");
+      text.textContent = step.text;
+      label.append(checkbox, text);
+      list.append(label);
+    });
+  } else {
+    list.append(makeEmpty("No steps yet"));
+  }
+  steps.append(stepTitle, list);
+
+  const actions = document.createElement("div");
+  actions.className = "detail-actions";
+  actions.append(createButton(isRhythm(item) ? "Done today" : "Done", "primary-button", () => {
+    completeCurrentStep(item.id);
+    els.detailDialog.close();
+  }));
+  actions.append(createButton("Snooze", "secondary-button", () => {
+    snoozeItem(item.id, "hour");
+    els.detailDialog.close();
+  }));
+  if (isProject(item)) {
+    actions.append(
+      createButton("Stuck", "secondary-button", () => {
+        els.detailDialog.close();
+        openStuck(item.id);
+      }),
+      createButton("Break down", "secondary-button", () => {
+        addBreakdown(item.id);
+        const updated = getItem(item.id);
+        if (updated) renderDetail(updated);
+      })
+    );
+  }
+  actions.append(createButton("Edit", "ghost-button", () => {
+    els.detailDialog.close();
+    openEdit(item.id);
+  }));
+
+  els.detailBody.append(summary, steps, actions);
 }
 
 function openEdit(itemId) {
@@ -2172,6 +2575,9 @@ function openEdit(itemId) {
   els.editKind.value = item.kind;
   els.editArea.value = item.area;
   els.editStatus.value = item.status;
+  els.editMode.value = item.mode || "home";
+  els.editTimeWindow.value = item.timeWindow || "anytime";
+  els.editExactTime.value = item.exactTime || "";
   els.editDue.value = item.due;
   els.editReview.value = item.review;
   els.editImportance.value = String(item.importance);
@@ -2221,6 +2627,9 @@ function saveEdit(event) {
     title: els.editTitle.value.trim() || "Untitled",
     area: els.editArea.value,
     status: els.editStatus.value,
+    mode: els.editMode.value,
+    timeWindow: els.editTimeWindow.value,
+    exactTime: els.editTimeWindow.value === "exact" ? els.editExactTime.value : "",
     due: els.editDue.value,
     review: els.editReview.value,
     cadence: normalizeKind(els.editKind.value) === "rhythm" ? els.editCadence.value : "",
@@ -2313,7 +2722,9 @@ function addRecurring() {
     kind: "rhythm",
     title: title.trim(),
     status: "active",
-    area: "Unsorted",
+    area: dashboardMode() === "work" ? "Work" : "Unsorted",
+    mode: dashboardMode(),
+    timeWindow: "anytime",
     cadence: normalizeCadence(cadence),
     trigger: trigger.trim(),
     minimum: minimum.trim(),
@@ -2379,6 +2790,15 @@ function bindEvents() {
   els.wizardNextButton.addEventListener("click", wizardNext);
   els.refreshNowButton.addEventListener("click", render);
 
+  els.modeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.mode = button.dataset.modeOption;
+      saveState();
+      render();
+      showView("now");
+    });
+  });
+
   els.navButtons.forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.view));
   });
@@ -2422,6 +2842,7 @@ function bindEvents() {
   });
 
   els.closeEditButton.addEventListener("click", () => els.itemDialog.close());
+  els.closeDetailButton.addEventListener("click", () => els.detailDialog.close());
   els.editForm.addEventListener("submit", saveEdit);
   els.editStepAddButton.addEventListener("click", () => {
     const id = els.editItemId.value;

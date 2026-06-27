@@ -24,15 +24,31 @@
 
       <main>
         <section class="view is-active" id="nowView" data-view-panel="now" aria-labelledby="nowTitle">
+          <section class="today-toolbar" aria-label="Dashboard mode">
+            <div class="mode-switch" role="group" aria-label="Mode">
+              <button class="mode-button is-active" type="button" data-mode-option="home">Home</button>
+              <button class="mode-button" type="button" data-mode-option="work">Work</button>
+            </div>
+            <div class="today-context">
+              <p class="eyebrow" id="todayModeLabel">Home mode</p>
+              <h2 id="nowTitle">Today</h2>
+              <p id="todayWindowLabel">Anytime</p>
+            </div>
+          </section>
+
           <section class="recommendation-shell" aria-labelledby="nowTitle">
+            <div id="recommendationPanel"></div>
+          </section>
+
+          <section class="today-queue-shell" aria-labelledby="todayQueueTitle">
             <div class="section-heading compact">
               <div>
-                <p class="eyebrow">Focus</p>
-                <h2 id="nowTitle">Do this now</h2>
+                <p class="eyebrow">Priority order</p>
+                <h2 id="todayQueueTitle">Today queue</h2>
               </div>
               <button class="secondary-button" id="refreshNowButton" type="button">Refresh</button>
             </div>
-            <div id="recommendationPanel"></div>
+            <div class="today-queue-list" id="todayQueueList"></div>
           </section>
 
           <form class="quick-capture" id="quickCaptureForm">
@@ -40,32 +56,13 @@
             <input id="quickCaptureInput" autocomplete="off" placeholder="Capture a loose thing">
             <button type="submit">Add</button>
           </form>
-
-          <section class="rhythms-due-shell" id="rhythmDueShell" aria-labelledby="rhythmsDueTitle">
-            <div class="section-heading compact">
-              <div>
-                <p class="eyebrow">Life rails</p>
-                <h2 id="rhythmsDueTitle">Rhythms due</h2>
-              </div>
-              <button class="secondary-button" type="button" data-add-rhythm>Add rhythm</button>
-            </div>
-            <div class="rhythm-due-list" id="rhythmDueList"></div>
-          </section>
-
-          <details class="daily-details">
-            <summary>Daily launch / shutdown</summary>
-            <section class="daily-loop" aria-label="Daily launch and shutdown">
-              <div id="dailyLaunchPanel"></div>
-              <div id="dailyShutdownPanel"></div>
-            </section>
-          </details>
         </section>
 
         <section class="view" id="wizardView" data-view-panel="wizard" aria-labelledby="wizardTitle">
           <div class="section-heading">
             <div>
               <p class="eyebrow">Guided setup</p>
-              <h2 id="wizardTitle">Wizard</h2>
+              <h2 id="wizardTitle">Add</h2>
             </div>
             <button class="secondary-button" id="resetWizardButton" type="button">Reset</button>
           </div>
@@ -163,13 +160,26 @@
       </main>
 
       <nav class="bottom-nav" aria-label="Views">
-        <button class="nav-button is-active" type="button" data-view="now">Now</button>
-        <button class="nav-button" type="button" data-view="wizard">Wizard</button>
+        <button class="nav-button is-active" type="button" data-view="now">Today</button>
+        <button class="nav-button" type="button" data-view="wizard">Add</button>
         <button class="nav-button" type="button" data-view="projects">Lists</button>
         <button class="nav-button" type="button" data-view="map">Map</button>
         <button class="nav-button" type="button" data-view="review">Review</button>
       </nav>
     </div>
+
+    <dialog id="detailDialog">
+      <section class="dialog-card detail-card" aria-labelledby="detailTitle">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow" id="detailMeta">Item</p>
+            <h2 id="detailTitle">Item detail</h2>
+          </div>
+          <button class="icon-button" type="button" id="closeDetailButton" aria-label="Close">x</button>
+        </div>
+        <div id="detailBody"></div>
+      </section>
+    </dialog>
 
     <dialog id="itemDialog">
       <form class="dialog-card" method="dialog" id="editForm">
@@ -197,6 +207,18 @@
           <label>
             Status
             <select id="editStatus"></select>
+          </label>
+          <label>
+            Mode
+            <select id="editMode"></select>
+          </label>
+          <label>
+            Time window
+            <select id="editTimeWindow"></select>
+          </label>
+          <label>
+            Exact time
+            <input id="editExactTime" type="time">
           </label>
           <label>
             Due
