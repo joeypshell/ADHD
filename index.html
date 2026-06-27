@@ -46,7 +46,10 @@
                 <p class="eyebrow">Priority order</p>
                 <h2 id="todayQueueTitle">Today queue</h2>
               </div>
-              <button class="secondary-button" id="refreshNowButton" type="button">Refresh</button>
+              <div class="heading-actions">
+                <button class="secondary-button" id="planTodayButton" type="button">Plan today</button>
+                <button class="secondary-button" id="refreshNowButton" type="button">Refresh</button>
+              </div>
             </div>
             <div class="today-queue-list" id="todayQueueList"></div>
           </section>
@@ -70,6 +73,15 @@
             <p class="eyebrow">Nothing active</p>
             <h3>Looks like you have nothing active yet.</h3>
             <p>Add one project or rhythm and I will turn it into the next small step.</p>
+          </section>
+          <section class="template-shelf" aria-labelledby="templatesTitle">
+            <div class="section-heading small">
+              <div>
+                <p class="eyebrow">Fast start</p>
+                <h2 id="templatesTitle">Templates</h2>
+              </div>
+            </div>
+            <div class="template-grid" id="templateGrid"></div>
           </section>
           <section class="wizard-card" aria-live="polite">
             <div class="wizard-progress">
@@ -178,6 +190,24 @@
           <button class="icon-button" type="button" id="closeDetailButton" aria-label="Close">x</button>
         </div>
         <div id="detailBody"></div>
+      </section>
+    </dialog>
+
+    <dialog id="planDialog">
+      <section class="dialog-card plan-card" aria-labelledby="planTitle">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow" id="planModeLabel">Plan today</p>
+            <h2 id="planTitle">Choose today's queue</h2>
+          </div>
+          <button class="icon-button" type="button" id="closePlanButton" aria-label="Close">x</button>
+        </div>
+        <p class="dialog-copy">Tap the things that should be on deck today. The Today screen will still keep urgent and due items visible.</p>
+        <div class="plan-list" id="planList"></div>
+        <div class="form-actions">
+          <button class="ghost-button" id="clearPlanButton" type="button">Clear today</button>
+          <button class="primary-button" id="savePlanButton" type="button">Done planning</button>
+        </div>
       </section>
     </dialog>
 

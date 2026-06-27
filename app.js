@@ -59,6 +59,122 @@ const TIME_WINDOWS = [
   { id: "exact", label: "Exact time", shortLabel: "Exact", start: null, end: null }
 ];
 
+const STARTER_TEMPLATES = [
+  {
+    id: "dishes",
+    title: "Dishes reset",
+    description: "Minimum kitchen reset",
+    kind: "rhythm",
+    area: "Home / Admin",
+    cadence: "daily",
+    timeWindow: "evening",
+    estimate: 10,
+    importance: 4,
+    dread: 2,
+    nextAction: "Clear one sink or counter",
+    minimum: "Clear one sink or counter",
+    steps: ["Clear one sink or counter", "Load or wash obvious dishes", "Wipe the main surface"]
+  },
+  {
+    id: "dinner",
+    title: "Plan dinner",
+    description: "Avoid the evening scramble",
+    kind: "rhythm",
+    area: "Home / Admin",
+    cadence: "daily",
+    timeWindow: "afternoon",
+    estimate: 10,
+    importance: 4,
+    nextAction: "Pick one dinner option",
+    minimum: "Pick one dinner option",
+    steps: ["Pick one dinner option", "Check ingredients", "Start the first prep step"]
+  },
+  {
+    id: "workout",
+    title: "Work out",
+    description: "Morning body anchor",
+    kind: "rhythm",
+    area: "Body / Exercise",
+    cadence: "daily",
+    timeWindow: "morning",
+    estimate: 30,
+    importance: 5,
+    nextAction: "Start the warmup",
+    minimum: "Start the warmup",
+    steps: ["Put on workout clothes", "Start the warmup", "Do the written plan"]
+  },
+  {
+    id: "gas",
+    title: "Get gas",
+    description: "Keep the car ready",
+    kind: "rhythm",
+    area: "Home / Admin",
+    cadence: "weekly",
+    timeWindow: "anytime",
+    estimate: 15,
+    importance: 3,
+    nextAction: "Check fuel level",
+    minimum: "Check fuel level",
+    steps: ["Check fuel level", "Pick the nearest gas stop", "Fill the tank"]
+  },
+  {
+    id: "cleaning-reset",
+    title: "Cleaning reset",
+    description: "Small home reset",
+    kind: "rhythm",
+    area: "Home / Admin",
+    cadence: "weekly",
+    timeWindow: "morning",
+    estimate: 15,
+    importance: 4,
+    nextAction: "Reset one visible surface",
+    minimum: "Reset one visible surface",
+    steps: ["Reset one visible surface", "Take out visible trash", "Put five items away"]
+  },
+  {
+    id: "work-task",
+    title: "Work task",
+    description: "Clarify and start",
+    kind: "project",
+    area: "Work",
+    mode: "work",
+    timeWindow: "morning",
+    estimate: 15,
+    importance: 4,
+    nextAction: "Define the next visible action",
+    steps: ["Define the next visible action", "Open the source material", "Send or save one update"]
+  },
+  {
+    id: "admin-appointment",
+    title: "Appointment/admin task",
+    description: "Portal, form, call, or booking",
+    kind: "project",
+    area: "Health / Medical",
+    timeWindow: "anytime",
+    estimate: 15,
+    importance: 5,
+    dread: 4,
+    consequence: "Medical/admin",
+    nextAction: "Open the portal or phone number",
+    steps: ["Open the portal or phone number", "Find the missing requirement", "Send or schedule one action"]
+  },
+  {
+    id: "scary-overdue",
+    title: "Scary overdue thing",
+    description: "Rescue without spiraling",
+    kind: "project",
+    area: "Unsorted",
+    status: "red",
+    timeWindow: "anytime",
+    estimate: 10,
+    importance: 5,
+    dread: 5,
+    consequence: "Embarrassing if ignored",
+    nextAction: "Open the scary thing for 5 minutes",
+    steps: ["Open the scary thing for 5 minutes", "Name the real consequence", "Send or schedule one recovery action"]
+  }
+];
+
 const DEFAULT_RHYTHMS = [
   {
     title: "Daily launch",
@@ -166,8 +282,10 @@ const els = {
   todayWindowLabel: document.querySelector("#todayWindowLabel"),
   todayQueueList: document.querySelector("#todayQueueList"),
   modeButtons: document.querySelectorAll("[data-mode-option]"),
+  planTodayButton: document.querySelector("#planTodayButton"),
   quickCaptureForm: document.querySelector("#quickCaptureForm"),
   quickCaptureInput: document.querySelector("#quickCaptureInput"),
+  templateGrid: document.querySelector("#templateGrid"),
   dailyLaunchPanel: document.querySelector("#dailyLaunchPanel"),
   dailyShutdownPanel: document.querySelector("#dailyShutdownPanel"),
   recommendationPanel: document.querySelector("#recommendationPanel"),
@@ -236,6 +354,12 @@ const els = {
   detailTitle: document.querySelector("#detailTitle"),
   detailBody: document.querySelector("#detailBody"),
   closeDetailButton: document.querySelector("#closeDetailButton"),
+  planDialog: document.querySelector("#planDialog"),
+  planModeLabel: document.querySelector("#planModeLabel"),
+  planList: document.querySelector("#planList"),
+  closePlanButton: document.querySelector("#closePlanButton"),
+  clearPlanButton: document.querySelector("#clearPlanButton"),
+  savePlanButton: document.querySelector("#savePlanButton"),
   deleteItemButton: document.querySelector("#deleteItemButton"),
   saveEditButton: document.querySelector("#saveEditButton"),
   stuckDialog: document.querySelector("#stuckDialog"),
@@ -363,6 +487,7 @@ function createRhythmItem(input = {}) {
     status: normalizeStatus(input.status || "active"),
     due: "",
     review: input.review || "",
+    plannedFor: input.plannedFor || "",
     cadence,
     trigger: input.trigger || "",
     minimum,
@@ -553,6 +678,7 @@ function normalizeItem(item) {
     status: normalizeStatus(item.status),
     due: item.due || "",
     review: item.review || "",
+    plannedFor: item.plannedFor || "",
     cadence: "",
     trigger: "",
     minimum: "",
@@ -599,6 +725,7 @@ function normalizeRhythmItem(item) {
     status: normalizeStatus(item.status || "active"),
     due: "",
     review: item.review || "",
+    plannedFor: item.plannedFor || "",
     cadence,
     trigger: item.trigger || "",
     minimum,
@@ -714,6 +841,7 @@ function addItem(input) {
       status: input.status || (input.kind === "rhythm" ? "active" : "inbox"),
       due: input.due || "",
       review: input.review || "",
+      plannedFor: input.plannedFor || "",
       cadence: input.cadence || "",
       trigger: input.trigger || "",
       minimum: input.minimum || "",
@@ -1339,6 +1467,7 @@ function buildWizardItem() {
     status,
     due: wizard.mode === "rhythm" ? "" : wizard.data.due,
     review: wizard.mode === "rhythm" ? "" : wizard.data.review || (status === "waiting" ? dateOffset(2) : ""),
+    plannedFor: todayIso(),
     cadence: wizard.mode === "rhythm" ? wizard.data.cadence : "",
     trigger: wizard.mode === "rhythm" ? wizard.data.trigger.trim() : "",
     minimum: wizard.mode === "rhythm" ? minimum : "",
@@ -1545,12 +1674,17 @@ function isCreatedToday(item) {
   return String(item.createdAt || "").startsWith(todayIso());
 }
 
+function isPlannedToday(item) {
+  return item.plannedFor === todayIso();
+}
+
 function todayCandidateReason(item) {
   const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
   const reviewDays = daysUntil(item.review);
   const window = timeWindowStatus(item);
   if (item.status === "now") return "marked now";
   if (item.status === "red") return "red zone";
+  if (isPlannedToday(item)) return "planned today";
   if (isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "rhythm overdue" : "rhythm due";
   if (!isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "overdue" : "due today";
   if (isCreatedToday(item)) return "captured today";
@@ -1576,6 +1710,7 @@ function todayQueueScore(item) {
   if (isRhythm(item) && dueDays !== null && dueDays <= 0) score += 50;
   if (dueDays !== null && dueDays <= 0) score += dueDays < 0 ? 80 : 55;
   if (reviewDays !== null && reviewDays <= 0) score += item.waitingFor.trim() ? 45 : 25;
+  if (isPlannedToday(item)) score += 72;
   if (isCreatedToday(item)) score += 18;
   if (window.state === "current") score += 24;
   if (window.state === "upcoming") score += 10;
@@ -1668,6 +1803,53 @@ function makeChip(text, variant = "") {
   chip.className = `info-chip ${variant}`.trim();
   chip.textContent = text;
   return chip;
+}
+
+function templateMode(template) {
+  return template.mode || dashboardMode();
+}
+
+function renderTemplates() {
+  if (!els.templateGrid) return;
+  els.templateGrid.replaceChildren();
+  STARTER_TEMPLATES.forEach((template) => els.templateGrid.append(makeTemplateCard(template)));
+}
+
+function makeTemplateCard(template) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "template-card";
+  const title = document.createElement("strong");
+  title.textContent = template.title;
+  const copy = document.createElement("span");
+  copy.textContent = template.description;
+  const meta = document.createElement("small");
+  meta.textContent = [
+    template.kind === "rhythm" ? "Rhythm" : "Project",
+    modeMeta(templateMode(template)).label,
+    timeWindowMeta(template.timeWindow).label
+  ].join(" / ");
+  button.append(title, copy, meta);
+  button.addEventListener("click", () => createFromTemplate(template));
+  return button;
+}
+
+function createFromTemplate(template) {
+  const mode = templateMode(template);
+  const item = addItem({
+    ...template,
+    title: template.title,
+    status: template.status || (template.kind === "rhythm" ? "active" : "inbox"),
+    mode,
+    area: template.area || (mode === "work" ? "Work" : "Unsorted"),
+    plannedFor: todayIso(),
+    review: template.kind === "rhythm" ? "" : todayIso()
+  });
+  if (mode !== dashboardMode() && DASHBOARD_MODES.some((entry) => entry.id === mode)) state.mode = mode;
+  saveState();
+  render();
+  showView("now");
+  openDetail(item.id);
 }
 
 function findOpenItem(id) {
@@ -2070,6 +2252,71 @@ function makeTodayQueueRow(entry, index) {
 
   row.append(rank, copy, meta);
   return row;
+}
+
+function planCandidates() {
+  return sortedItems(state.items.filter((item) => {
+    if (!isOpen(item) || isSnoozed(item) || !isUserVisibleItem(item) || !itemMatchesMode(item)) return false;
+    if (isPlannedToday(item)) return true;
+    if (todayCandidateReason(item)) return true;
+    return item.status === "inbox" || item.status === "active" || item.status === "waiting";
+  })).slice(0, 18);
+}
+
+function openPlanToday() {
+  renderPlanToday();
+  if (!els.planDialog.open) els.planDialog.showModal();
+}
+
+function renderPlanToday() {
+  if (!els.planList) return;
+  els.planModeLabel.textContent = `${modeMeta().label} mode`;
+  els.planList.replaceChildren();
+  const items = planCandidates();
+  if (!items.length) {
+    els.planList.append(makeEmpty("Nothing available to plan in this mode"));
+    return;
+  }
+
+  items.forEach((item) => {
+    const label = document.createElement("label");
+    label.className = `plan-row status-${item.status}`;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = isPlannedToday(item);
+    checkbox.addEventListener("change", () => {
+      item.plannedFor = checkbox.checked ? todayIso() : "";
+      item.updatedAt = new Date().toISOString();
+      saveState();
+      renderRecommendation();
+      renderPlanToday();
+    });
+
+    const copy = document.createElement("span");
+    copy.className = "plan-copy";
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const detail = document.createElement("span");
+    detail.textContent = currentTinyStep(item);
+    copy.append(title, detail);
+
+    const meta = document.createElement("small");
+    meta.textContent = [todayCandidateReason(item) || "available", formatTimeWindow(item), statusLabel(item.status)].join(" / ");
+    label.append(checkbox, copy, meta);
+    els.planList.append(label);
+  });
+}
+
+function clearTodayPlanItems() {
+  state.items.forEach((item) => {
+    if (itemMatchesMode(item) && item.plannedFor === todayIso()) {
+      item.plannedFor = "";
+      item.updatedAt = new Date().toISOString();
+    }
+  });
+  saveState();
+  render();
+  renderPlanToday();
 }
 
 function makeMiniItem(item) {
@@ -2789,6 +3036,7 @@ function bindEvents() {
   els.wizardSkipButton.addEventListener("click", wizardSkip);
   els.wizardNextButton.addEventListener("click", wizardNext);
   els.refreshNowButton.addEventListener("click", render);
+  els.planTodayButton.addEventListener("click", openPlanToday);
 
   els.modeButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -2843,6 +3091,12 @@ function bindEvents() {
 
   els.closeEditButton.addEventListener("click", () => els.itemDialog.close());
   els.closeDetailButton.addEventListener("click", () => els.detailDialog.close());
+  els.closePlanButton.addEventListener("click", () => els.planDialog.close());
+  els.savePlanButton.addEventListener("click", () => {
+    els.planDialog.close();
+    showView("now");
+  });
+  els.clearPlanButton.addEventListener("click", clearTodayPlanItems);
   els.editForm.addEventListener("submit", saveEdit);
   els.editStepAddButton.addEventListener("click", () => {
     const id = els.editItemId.value;
@@ -2872,6 +3126,7 @@ function render() {
   ensureTodayPlan();
   renderStats();
   renderWizard();
+  renderTemplates();
   renderDailyLoop();
   renderRecommendation();
   renderRhythmsDue();
