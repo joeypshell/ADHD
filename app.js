@@ -1567,7 +1567,8 @@ function completeCurrentStep(itemId) {
   const step = item.steps.find((entry) => !entry.done);
   if (step) {
     step.done = true;
-    if (item.status === "inbox") item.status = "active";
+    const finished = item.steps.every((entry) => entry.done);
+    item.status = finished ? "done" : item.status === "inbox" ? "active" : item.status;
     clearFocusForItem(itemId);
     item.updatedAt = new Date().toISOString();
     item.lastTouched = item.updatedAt;
@@ -2152,11 +2153,14 @@ function renderRecommendation() {
 
 function makeTodayQueueRow(entry, index, isCurrent = false) {
   const item = entry.item;
-  const row = document.createElement("button");
-  row.type = "button";
+  const row = document.createElement("article");
   row.className = `today-queue-row status-${item.status}${isCurrent ? " is-current" : ""}`;
   if (isCurrent) row.setAttribute("aria-current", "true");
-  row.addEventListener("click", () => openDetail(item.id));
+
+  const openButton = document.createElement("button");
+  openButton.type = "button";
+  openButton.className = "queue-open";
+  openButton.addEventListener("click", () => openDetail(item.id));
 
   const rank = document.createElement("span");
   rank.className = "queue-rank";
@@ -2174,7 +2178,15 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
   meta.className = "queue-meta";
   meta.textContent = [isCurrent ? "Next" : "", entry.reason, formatTimeWindow(item), `${item.estimate} min`].filter(Boolean).join(" / ");
 
-  row.append(rank, copy, meta);
+  const doneButton = document.createElement("button");
+  doneButton.type = "button";
+  doneButton.className = "queue-done-button";
+  doneButton.textContent = "Done";
+  doneButton.setAttribute("aria-label", `Mark ${item.title} done`);
+  doneButton.addEventListener("click", () => completeItem(item.id));
+
+  openButton.append(rank, copy, meta);
+  row.append(openButton, doneButton);
   return row;
 }
 
