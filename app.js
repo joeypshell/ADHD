@@ -269,6 +269,7 @@ const els = {
   todayLabel: document.querySelector("#todayLabel"),
   todayModeLabel: document.querySelector("#todayModeLabel"),
   todayWindowLabel: document.querySelector("#todayWindowLabel"),
+  todayTimeline: document.querySelector("#todayTimeline"),
   todayQueueCount: document.querySelector("#todayQueueCount"),
   todayQueueList: document.querySelector("#todayQueueList"),
   modeButtons: document.querySelectorAll("[data-mode-option]"),
@@ -1945,6 +1946,118 @@ function makeChip(text, variant = "") {
   return chip;
 }
 
+function itemTone(item) {
+  if (item.status === "red") return "red";
+  if (item.status === "waiting") return "waiting";
+  if (isRhythm(item)) return "rhythm";
+  const areaTones = {
+    "Work": "work",
+    "Health / Medical": "health",
+    "Home / Admin": "home",
+    "Money": "money",
+    "Writing": "writing",
+    "Body / Exercise": "body",
+    "Relationships": "relationships"
+  };
+  return areaTones[item.area] || "other";
+}
+
+function itemGlyph(item) {
+  if (item.status === "red") return "!";
+  if (item.status === "waiting") return "...";
+  if (isRhythm(item)) return "R";
+  const areaGlyphs = {
+    "Work": "W",
+    "Health / Medical": "+",
+    "Home / Admin": "H",
+    "Money": "$",
+    "Writing": "P",
+    "Body / Exercise": "B",
+    "Relationships": "S"
+  };
+  return areaGlyphs[item.area] || "U";
+}
+
+function timelineBucket(entry, topItemId) {
+  const item = entry.item;
+  const window = timeWindowStatus(item);
+  if (item.id === topItemId || isFocusItem(item) || item.status === "now") return "now";
+  if (window.state === "missed") return "missed";
+  if (window.state === "upcoming" || window.state === "future") return "later";
+  return "next";
+}
+
+function renderTodayTimeline(entries, topItemId = "") {
+  if (!els.todayTimeline) return;
+  els.todayTimeline.replaceChildren();
+  const groups = [
+    { id: "now", label: "Now" },
+    { id: "next", label: "Next" },
+    { id: "later", label: "Later" },
+    { id: "missed", label: "Missed" }
+  ];
+  const buckets = Object.fromEntries(groups.map((group) => [group.id, []]));
+  entries.forEach((entry) => {
+    buckets[timelineBucket(entry, topItemId)].push(entry);
+  });
+
+  if (!entries.length) {
+    els.todayTimeline.append(makeEmpty("No timeline for this mode yet"));
+    return;
+  }
+
+  groups.forEach((group) => {
+    const card = document.createElement("article");
+    card.className = `timeline-group timeline-${group.id}`;
+    const head = document.createElement("div");
+    head.className = "timeline-head";
+    const title = document.createElement("strong");
+    title.textContent = group.label;
+    const count = document.createElement("span");
+    count.textContent = String(buckets[group.id].length);
+    head.append(title, count);
+
+    const list = document.createElement("div");
+    list.className = "timeline-items";
+    if (buckets[group.id].length) {
+      buckets[group.id].slice(0, 3).forEach((entry) => list.append(makeTimelineItem(entry)));
+      if (buckets[group.id].length > 3) {
+        const more = document.createElement("p");
+        more.className = "timeline-more";
+        more.textContent = `+${buckets[group.id].length - 3} more`;
+        list.append(more);
+      }
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "timeline-empty";
+      empty.textContent = "Clear";
+      list.append(empty);
+    }
+    card.append(head, list);
+    els.todayTimeline.append(card);
+  });
+}
+
+function makeTimelineItem(entry) {
+  const item = entry.item;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `timeline-item tone-${itemTone(item)}`;
+  button.addEventListener("click", () => openDetail(item.id));
+  const glyph = document.createElement("span");
+  glyph.className = "item-glyph";
+  glyph.textContent = itemGlyph(item);
+  const copy = document.createElement("span");
+  copy.className = "timeline-copy";
+  const title = document.createElement("strong");
+  title.textContent = item.title;
+  const meta = document.createElement("span");
+  meta.textContent = [entry.reason, formatTimeWindow(item)].filter(Boolean).join(" / ");
+  copy.append(title, meta);
+  button.append(glyph, copy);
+  return button;
+}
+
 function makeFocusPill(item) {
   const session = activeFocusSession();
   const pill = document.createElement("button");
@@ -2021,6 +2134,7 @@ function renderRecommendation() {
   document.body.dataset.mode = dashboardMode();
   if (els.todayQueueCount) els.todayQueueCount.textContent = `${todayEntries.length} ${todayEntries.length === 1 ? "task" : "tasks"}`;
   els.recommendationPanel.replaceChildren();
+  renderTodayTimeline(todayEntries, top?.item.id || "");
   if (els.todayQueueList) els.todayQueueList.replaceChildren();
 
   if (!top) {
@@ -2154,7 +2268,7 @@ function renderRecommendation() {
 function makeTodayQueueRow(entry, index, isCurrent = false) {
   const item = entry.item;
   const row = document.createElement("article");
-  row.className = `today-queue-row status-${item.status}${isCurrent ? " is-current" : ""}`;
+  row.className = `today-queue-row status-${item.status} tone-${itemTone(item)}${isCurrent ? " is-current" : ""}`;
   if (isCurrent) row.setAttribute("aria-current", "true");
 
   const openButton = document.createElement("button");
