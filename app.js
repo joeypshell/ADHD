@@ -298,6 +298,7 @@ const els = {
   focusAnchor: document.querySelector("#focusAnchor"),
   energyButtons: document.querySelectorAll("[data-energy]"),
   brainButtons: document.querySelectorAll("[data-brain]"),
+  checkinEffect: document.querySelector("#checkinEffect"),
   clearCheckinButton: document.querySelector("#clearCheckinButton"),
   todayTimeline: document.querySelector("#todayTimeline"),
   todayQueueCount: document.querySelector("#todayQueueCount"),
@@ -1967,7 +1968,63 @@ function checkinScoreAdjustment(item) {
   return score;
 }
 
-function recommendationReason(item) {
+function checkinEffectMessages(checkin = normalizeDailyCheckin(state.dailyCheckin)) {
+  const messages = [];
+  const energyMessages = {
+    low: "Low energy: boosts short tasks and rhythms; lowers big high-dread tasks.",
+    medium: "Normal energy: gives a small boost to tasks 15 minutes or less.",
+    high: "High energy: boosts red-zone, important, and longer low-dread tasks."
+  };
+  const brainMessages = {
+    clear: "Clear: gives important tasks a small boost.",
+    foggy: "Foggy: boosts short, concrete tasks with few steps.",
+    avoiding: "Avoiding: boosts short, scary, consequence-heavy tasks.",
+    overloaded: "Overloaded: boosts rhythms, waiting checkbacks, and very small tasks."
+  };
+  if (energyMessages[checkin.energy]) messages.push(energyMessages[checkin.energy]);
+  if (brainMessages[checkin.brain]) messages.push(brainMessages[checkin.brain]);
+  if (!messages.length) messages.push("No check-in selected: Today uses due dates, rhythms, time windows, importance, dread, snoozes, and staleness.");
+  return messages;
+}
+
+function checkinReasonsForItem(item) {
+  const checkin = normalizeDailyCheckin(state.dailyCheckin);
+  const reasons = [];
+
+  if (checkin.energy === "low") {
+    if (item.estimate <= 10) reasons.push("low energy: short task");
+    if (isRhythm(item)) reasons.push("low energy: rhythm");
+    if (item.dread >= 5 && item.estimate > 15) reasons.push("low energy: big scary task lowered");
+  } else if (checkin.energy === "high") {
+    if (item.status === "red") reasons.push("high energy: red zone");
+    if (item.importance >= 4) reasons.push("high energy: important");
+    if (item.estimate >= 30 && item.dread <= 3) reasons.push("high energy: longer low-dread task");
+  } else if (checkin.energy === "medium") {
+    if (item.estimate <= 15) reasons.push("normal energy: manageable");
+  }
+
+  if (checkin.brain === "foggy") {
+    if (item.estimate <= 10) reasons.push("foggy: short task");
+    if (currentTinyStep(item).length <= 42) reasons.push("foggy: concrete tiny start");
+    if (item.steps.length <= 2) reasons.push("foggy: few steps");
+  } else if (checkin.brain === "avoiding") {
+    if (item.status === "red") reasons.push("avoiding: red zone");
+    if (item.consequence.trim()) reasons.push("avoiding: consequence");
+    if (item.estimate <= 10) reasons.push("avoiding: short task");
+    if (item.dread >= 3) reasons.push("avoiding: dread");
+  } else if (checkin.brain === "overloaded") {
+    if (isRhythm(item)) reasons.push("overloaded: rhythm");
+    if (item.estimate <= 10) reasons.push("overloaded: tiny task");
+    if (item.status === "waiting") reasons.push("overloaded: waiting checkback");
+    if (item.estimate >= 30) reasons.push("overloaded: long task lowered");
+  } else if (checkin.brain === "clear") {
+    if (item.importance >= 4) reasons.push("clear: important");
+  }
+
+  return [...new Set(reasons)];
+}
+
+function recommendationReason(item, limit = 5) {
   const reasons = [];
   const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
   const reviewDays = daysUntil(item.review);
@@ -1980,6 +2037,7 @@ function recommendationReason(item) {
     else if (dueDays === 0) reasons.push("due today");
     else if (dueDays <= 7) reasons.push(`due in ${dueDays}d`);
   }
+  checkinReasonsForItem(item).forEach((reason) => reasons.push(reason));
   if (item.consequence.trim()) reasons.push(item.consequence.trim());
   if (item.waitingFor.trim() && reviewDays !== null && reviewDays <= 0) reasons.push("waiting checkback");
   if (window.state !== "anytime") reasons.push(window.label);
@@ -1987,7 +2045,19 @@ function recommendationReason(item) {
   if (item.snoozeCount > 0) reasons.push(`snoozed ${item.snoozeCount}x`);
   if (!reasons.length) reasons.push(item.area);
 
-  return reasons.slice(0, 3);
+  return [...new Set(reasons)].slice(0, limit);
+}
+
+function recommendationWhyText(item, candidateReason = "") {
+  const reasons = [];
+  if (candidateReason && candidateReason !== "next active") reasons.push(candidateReason);
+  checkinReasonsForItem(item).forEach((reason) => {
+    if (!reasons.includes(reason)) reasons.push(reason);
+  });
+  recommendationReason(item, 6).forEach((reason) => {
+    if (!reasons.includes(reason)) reasons.push(reason);
+  });
+  return reasons.slice(0, 4).join(" + ") || item.area;
 }
 
 function nextCardMeta(item, reason = "") {
@@ -2519,6 +2589,14 @@ function renderCheckin() {
     button.setAttribute("aria-pressed", button.dataset.brain === checkin.brain ? "true" : "false");
   });
   if (els.clearCheckinButton) els.clearCheckinButton.hidden = !checkin.energy && !checkin.brain;
+  if (els.checkinEffect) {
+    els.checkinEffect.replaceChildren();
+    checkinEffectMessages(checkin).forEach((message) => {
+      const line = document.createElement("p");
+      line.textContent = message;
+      els.checkinEffect.append(line);
+    });
+  }
 }
 
 function setCheckin(patch) {
@@ -2627,7 +2705,7 @@ function renderRecommendation() {
   const timeText = session ? focusSessionStateText(session) : isRhythm(item)
     ? `${item.estimate} min minimum / ${cadenceMeta(item.cadence).label}${item.lastDone ? ` / last done ${formatDate(item.lastDone)}` : ""}`
     : `${item.estimate} min / ${doneSteps} of ${item.steps.length || 1} steps`;
-  const whyText = item.consequence.trim() || top.reason || recommendationReason(item)[0] || item.area;
+  const whyText = recommendationWhyText(item, top.reason);
   const detailGrid = document.createElement("div");
   detailGrid.className = "next-detail-grid";
   const timeDetail = makeNextDetail("Time", timeText, "time");
@@ -2637,6 +2715,12 @@ function renderRecommendation() {
     makeNextDetail("Tiny start", currentTinyStep(item), "tiny"),
     timeDetail
   );
+
+  const reasonStrip = document.createElement("div");
+  reasonStrip.className = "next-reason-strip";
+  recommendationReason(item, 6).forEach((reason, index) => {
+    reasonStrip.append(makeChip(reason, index === 0 ? "strong" : ""));
+  });
 
   const progress = document.createElement("div");
   progress.className = "progress-line next-progress";
@@ -2673,7 +2757,7 @@ function renderRecommendation() {
     }));
   }
 
-  body.append(main, detailGrid, progress);
+  body.append(main, detailGrid, reasonStrip, progress);
   if (isFocusItem(item)) body.append(makeFocusPill(item));
   body.append(actions);
   panel.append(band, body);

@@ -101,7 +101,7 @@ The optional daily check-in can adjust scoring for the current day:
 - energy: low, medium, high
 - brain state: clear, foggy, avoiding, overloaded
 
-The check-in is local and resets when stale.
+The check-in is local and resets when stale. The Today screen explains the selected check-in effect and adds matching reason chips to the recommendation when those rules affect the top item.
 
 ## Time Windows
 

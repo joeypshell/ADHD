@@ -50,7 +50,7 @@
                 <p class="choice-label">Energy</p>
                 <div class="segmented-row" id="energyButtons" role="group" aria-label="Energy today">
                   <button type="button" data-energy="low">Low</button>
-                  <button type="button" data-energy="medium">Medium</button>
+                  <button type="button" data-energy="medium">Normal</button>
                   <button type="button" data-energy="high">High</button>
                 </div>
               </div>
@@ -64,6 +64,7 @@
                 </div>
               </div>
             </div>
+            <div class="checkin-effect" id="checkinEffect" aria-live="polite"></div>
           </section>
 
           <section class="recommendation-shell" aria-labelledby="nowTitle">
@@ -88,7 +89,7 @@
               </div>
               <div class="heading-actions">
                 <span class="queue-count" id="todayQueueCount">0 tasks</span>
-                <button class="secondary-button" id="refreshNowButton" type="button">Refresh</button>
+                <button class="secondary-button" id="refreshNowButton" type="button">Re-rank</button>
               </div>
             </div>
             <div class="today-queue-list" id="todayQueueList"></div>

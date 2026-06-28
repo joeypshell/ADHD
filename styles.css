@@ -487,6 +487,23 @@ textarea {
   gap: 10px;
 }
 
+.checkin-effect {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--teal-soft) 34%, #fff);
+  border: 1px solid color-mix(in srgb, var(--teal) 14%, var(--line));
+  border-radius: 14px;
+}
+
+.checkin-effect p {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
 .segmented-row {
   display: flex;
   flex-wrap: wrap;
@@ -1255,6 +1272,12 @@ textarea {
 .next-detail.time {
   border-color: color-mix(in srgb, var(--cyan) 20%, var(--line));
   background: color-mix(in srgb, #dff3fb 58%, #fff);
+}
+
+.next-reason-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .now-actions .primary-button,
