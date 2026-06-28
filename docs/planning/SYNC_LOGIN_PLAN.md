@@ -141,6 +141,8 @@ Row-level security:
 - users can update only their own `user_id`
 - users can delete only their own `user_id`
 
+The runnable SQL and verification queries live in `docs/planning/SUPABASE_SETUP.md`.
+
 ## Static Config Boundary
 
 Allowed in GitHub Pages:
@@ -236,10 +238,18 @@ Before writing sync code:
 
 ## Implementation Checklist Issues
 
-1. Add Supabase client script/config and disabled-by-default sync flag.
-2. Add auth UI in settings.
-3. Add `user_state` schema SQL and RLS docs.
-4. Add first-login migration dialog.
-5. Add manual Sync now with one-document upload/download.
-6. Add conflict screen for cloud/local divergence.
-7. Add sync status tests and browser QA.
+Completed scaffold:
+
+- Add public `sync-config.js` with sync disabled by default.
+- Add Settings sync status panel with guarded Login, Logout, and Sync now buttons.
+- Add `state.sync` metadata for client id, login display, and future sync timestamps.
+- Add `user_state` schema SQL and RLS docs.
+
+Remaining implementation:
+
+1. Add Supabase browser client.
+2. Wire login/logout to Supabase Auth.
+3. Add first-login migration dialog.
+4. Add manual Sync now with one-document upload/download.
+5. Add conflict screen for cloud/local divergence.
+6. Add sync status tests and browser QA.

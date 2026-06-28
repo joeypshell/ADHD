@@ -1,8 +1,9 @@
-const CACHE_NAME = "life-command-center-v25";
+const CACHE_NAME = "life-command-center-v26";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
+  "./sync-config.js",
   "./app.js",
   "./manifest.webmanifest",
   "./icon.svg"

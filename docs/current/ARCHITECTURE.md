@@ -10,6 +10,7 @@ Runtime files:
 
 - `index.html`
 - `styles.css`
+- `sync-config.js`
 - `app.js`
 - `sw.js`
 - `manifest.webmanifest`
@@ -17,7 +18,7 @@ Runtime files:
 
 ## Storage
 
-All user data is stored in browser `localStorage`.
+All active user data is stored in browser `localStorage`.
 
 Current key:
 
@@ -28,6 +29,8 @@ Legacy key:
 - `life-command-center-v1`
 
 Because GitHub Pages is static, the app cannot sync data back to GitHub by itself. Import/export is the current backup path.
+
+`sync-config.js` defines `window.LCC_SYNC_CONFIG`. It is disabled by default and may contain only browser-safe public values, such as a Supabase project URL and public anon key. The Settings sync panel reads this config and shows guardrails, but there is no active login, remote read, or remote write yet.
 
 ## Data Model
 
@@ -43,6 +46,7 @@ The main state object contains:
 - `focusSession`
 - `dailyCheckin`
 - `alerts`
+- `sync`
 - `items`
 - `recurring`
 
@@ -151,6 +155,13 @@ Review:
 
 - review candidates based on due/review/stale/red criteria
 
+Settings / Backup:
+
+- local export/import
+- rhythm alert permission controls
+- disabled-by-default sync status scaffold
+- guarded login/logout/sync buttons until Supabase auth and cloud storage are implemented
+
 ## Focus Session
 
 Focus state is stored in `state.focusSession`. It tracks:
@@ -227,6 +238,7 @@ This is acceptable for now, but large features should avoid making `renderRecomm
 - No cross-device sync.
 - No login.
 - No cloud storage.
+- Sync is UI/config/schema scaffold only.
 - No cloud speech service or AI voice parsing.
 - No AI-backed task extraction or prioritization.
 - No native or cross-device reminder system.

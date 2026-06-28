@@ -330,6 +330,23 @@
           <strong>Saved only on this browser</strong>
           <span>Until sync exists, this phone/browser owns its own copy. Export before switching devices, clearing browser data, or experimenting heavily.</span>
         </div>
+        <section class="sync-panel" aria-labelledby="syncTitle">
+          <div class="sync-panel-heading">
+            <div>
+              <p class="eyebrow">Cloud sync</p>
+              <h3 id="syncTitle">Sync</h3>
+            </div>
+            <span class="sync-badge" id="syncStatusBadge">Off</span>
+          </div>
+          <div class="sync-status" id="syncStatus"></div>
+          <p class="dialog-copy small-copy" id="syncCopy">Sync is disabled until Supabase public config is added.</p>
+          <div class="sync-actions">
+            <button class="secondary-button" id="syncLoginButton" type="button">Log in</button>
+            <button class="secondary-button" id="syncNowButton" type="button">Sync now</button>
+            <button class="ghost-button" id="syncLogoutButton" type="button">Log out</button>
+          </div>
+          <p class="sync-feedback" id="syncFeedback" aria-live="polite"></p>
+        </section>
         <div class="backup-actions">
           <button class="primary-button" id="exportButton" type="button">Export backup</button>
           <button class="secondary-button" id="importButton" type="button">Import backup</button>
@@ -547,6 +564,7 @@
       </article>
     </template>
 
+    <script src="sync-config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

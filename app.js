@@ -215,7 +215,7 @@ const STARTER_RHYTHM_TITLES = new Set([
 ]);
 
 const DEFAULT_DATA = {
-  version: 8,
+  version: 9,
   createdAt: new Date().toISOString(),
   lastReviewed: "",
   lastBackupAt: "",
@@ -225,6 +225,7 @@ const DEFAULT_DATA = {
   focusSession: null,
   dailyCheckin: createDailyCheckin(),
   alerts: createAlertSettings(),
+  sync: createSyncState(),
   items: DEFAULT_RHYTHMS.map((rhythm) => createRhythmItem(rhythm)),
   recurring: []
 };
@@ -329,6 +330,13 @@ const els = {
   backupDialog: document.querySelector("#backupDialog"),
   backupStatus: document.querySelector("#backupStatus"),
   backupFeedback: document.querySelector("#backupFeedback"),
+  syncStatusBadge: document.querySelector("#syncStatusBadge"),
+  syncStatus: document.querySelector("#syncStatus"),
+  syncCopy: document.querySelector("#syncCopy"),
+  syncFeedback: document.querySelector("#syncFeedback"),
+  syncLoginButton: document.querySelector("#syncLoginButton"),
+  syncLogoutButton: document.querySelector("#syncLogoutButton"),
+  syncNowButton: document.querySelector("#syncNowButton"),
   rhythmAlertButton: document.querySelector("#rhythmAlertButton"),
   alertStatus: document.querySelector("#alertStatus"),
   closeBackupButton: document.querySelector("#closeBackupButton"),
@@ -476,6 +484,31 @@ function createAlertSettings() {
   return {
     rhythmEnabled: false,
     rhythmNotifiedKey: ""
+  };
+}
+
+function createSyncState() {
+  return {
+    clientId: `client-${cryptoId()}`,
+    enabled: false,
+    lastSyncedAt: "",
+    lastSyncedServerUpdatedAt: "",
+    userEmail: "",
+    status: "off"
+  };
+}
+
+function normalizeSyncState(sync = {}) {
+  const fallback = createSyncState();
+  return {
+    ...fallback,
+    ...sync,
+    clientId: sync.clientId || fallback.clientId,
+    enabled: Boolean(sync.enabled),
+    lastSyncedAt: sync.lastSyncedAt || "",
+    lastSyncedServerUpdatedAt: sync.lastSyncedServerUpdatedAt || "",
+    userEmail: sync.userEmail || "",
+    status: sync.status || "off"
   };
 }
 
@@ -745,7 +778,7 @@ function normalizeData(data) {
   const normalized = {
     ...cloneData(DEFAULT_DATA),
     ...data,
-    version: 8,
+    version: 9,
     lastBackupAt: data.lastBackupAt || "",
     mode: DASHBOARD_MODES.some((mode) => mode.id === data.mode) ? data.mode : "home",
     filter: { area: "all", status: "", kind: "", ...(data.filter || {}) },
@@ -753,6 +786,7 @@ function normalizeData(data) {
     focusSession: normalizeFocusSession(data.focusSession),
     dailyCheckin: normalizeDailyCheckin(data.dailyCheckin),
     alerts: normalizeAlertSettings(data.alerts),
+    sync: normalizeSyncState(data.sync),
     items: [...sourceItems, ...migratedRhythms],
     recurring: []
   };
@@ -4204,6 +4238,7 @@ function renderBackupStatus() {
     els.backupStatus.className = `backup-status${stale ? " needs-backup" : ""}`;
     els.backupStatus.textContent = `${backupAgeText()} ${stale ? "This browser has no recent backup." : "Recent backup marker is saved locally."}`;
   }
+  renderSyncStatus();
 
   const canNotify = "Notification" in window;
   if (els.rhythmAlertButton) {
@@ -4226,6 +4261,115 @@ function setBackupFeedback(message, tone = "ok") {
   if (!els.backupFeedback) return;
   els.backupFeedback.textContent = message;
   els.backupFeedback.className = `backup-feedback ${tone}`;
+}
+
+function publicSyncConfig() {
+  const config = window.LCC_SYNC_CONFIG || {};
+  return {
+    enabled: config.enabled === true,
+    provider: config.provider || "supabase",
+    supabaseUrl: String(config.supabaseUrl || "").trim(),
+    supabaseAnonKey: String(config.supabaseAnonKey || "").trim()
+  };
+}
+
+function syncConfigReady(config = publicSyncConfig()) {
+  return config.enabled && config.provider === "supabase" && Boolean(config.supabaseUrl && config.supabaseAnonKey);
+}
+
+function syncStatusInfo() {
+  const config = publicSyncConfig();
+  const ready = syncConfigReady(config);
+  if (!config.enabled) {
+    return {
+      badge: "Off",
+      tone: "warn",
+      status: "Sync is off. This browser is still the only live copy unless you export a backup.",
+      copy: "Add Supabase public config in sync-config.js to enable the next login/sync step."
+    };
+  }
+  if (!ready) {
+    return {
+      badge: "Config needed",
+      tone: "warn",
+      status: "Sync is enabled but Supabase URL or public anon key is missing.",
+      copy: "Only the Supabase URL and anon key belong in the static app. Never add the service role key."
+    };
+  }
+  if (state.sync?.userEmail) {
+    return {
+      badge: "Signed in",
+      tone: "ok",
+      status: `Signed in as ${state.sync.userEmail}. Manual sync will use one user-scoped JSON document.`,
+      copy: state.sync.lastSyncedAt ? `Last synced ${formatDateTime(state.sync.lastSyncedAt)}.` : "No sync has run in this browser yet."
+    };
+  }
+  return {
+    badge: "Ready",
+    tone: "ok",
+    status: "Supabase public config is present. Login and manual sync are ready for the next implementation pass.",
+    copy: "First login will ask whether to upload this browser, use the cloud copy, or stay local."
+  };
+}
+
+function renderSyncStatus() {
+  const info = syncStatusInfo();
+  if (els.syncStatusBadge) {
+    els.syncStatusBadge.textContent = info.badge;
+    els.syncStatusBadge.className = `sync-badge ${info.tone}`;
+  }
+  if (els.syncStatus) {
+    els.syncStatus.textContent = info.status;
+    els.syncStatus.className = `sync-status ${info.tone}`;
+  }
+  if (els.syncCopy) els.syncCopy.textContent = info.copy;
+  if (els.syncLoginButton) els.syncLoginButton.disabled = false;
+  if (els.syncNowButton) els.syncNowButton.disabled = false;
+  if (els.syncLogoutButton) els.syncLogoutButton.disabled = false;
+}
+
+function setSyncFeedback(message, tone = "ok") {
+  if (!els.syncFeedback) return;
+  els.syncFeedback.textContent = message;
+  els.syncFeedback.className = `sync-feedback ${tone}`;
+}
+
+function requireSyncReady(actionLabel) {
+  const config = publicSyncConfig();
+  if (!config.enabled) {
+    setSyncFeedback(`${actionLabel} is blocked because sync is off. Add Supabase public config in sync-config.js first.`, "warn");
+    return false;
+  }
+  if (!syncConfigReady(config)) {
+    setSyncFeedback(`${actionLabel} is blocked because Supabase URL or anon key is missing.`, "warn");
+    return false;
+  }
+  return true;
+}
+
+function syncLogin() {
+  if (!requireSyncReady("Login")) return;
+  setSyncFeedback("Login UI is scaffolded. The next sync pass will wire Supabase Auth and the first-login migration choices.", "ok");
+}
+
+function syncLogout() {
+  if (!state.sync?.userEmail) {
+    setSyncFeedback("No cloud session is active in this browser.", "warn");
+    return;
+  }
+  state.sync = normalizeSyncState({ ...state.sync, userEmail: "", status: "ready" });
+  saveState();
+  renderSyncStatus();
+  setSyncFeedback("Signed out locally. Task data stayed in this browser.", "ok");
+}
+
+function syncNow() {
+  if (!requireSyncReady("Sync now")) return;
+  if (!state.sync?.userEmail) {
+    setSyncFeedback("Sync now needs login first. The first-login flow will offer Upload this browser or Use cloud copy.", "warn");
+    return;
+  }
+  setSyncFeedback("Manual sync scaffold reached. Real upload/download will use the user_state JSON document.", "ok");
 }
 
 function exportData() {
@@ -4409,6 +4553,9 @@ function bindEvents() {
   els.closeBackupButton.addEventListener("click", () => els.backupDialog.close());
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
+  els.syncLoginButton.addEventListener("click", syncLogin);
+  els.syncLogoutButton.addEventListener("click", syncLogout);
+  els.syncNowButton.addEventListener("click", syncNow);
   els.rhythmAlertButton.addEventListener("click", enableRhythmAlerts);
   els.importFile.addEventListener("change", () => {
     const [file] = els.importFile.files;
