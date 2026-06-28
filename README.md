@@ -2,12 +2,14 @@
 
 A static, mobile-first command center for ADHD-style executive function support. It is built for GitHub Pages and runs without a build step.
 
-The primary screen is a Today cockpit: it recommends one clear action, shows a short priority queue, and keeps project/list/map/review views secondary over the same local data.
+The primary screen is a Today cockpit: it recommends one clear action, shows a short priority queue, and keeps rhythm/list/map/review views secondary over the same local data.
 
 The app has two lanes:
 
 - Projects: finite things with an endpoint, steps, due/review dates, and stuck handling.
 - Rhythms: recurring life rails like cleaning, gas, working out, weekly reset, and annual/admin maintenance.
+
+The Rhythms tab shows recurring loops grouped by due now, coming up, and all rhythms. Missed rhythms stay visible until marked done.
 
 Daily Launch gives the day a shape:
 

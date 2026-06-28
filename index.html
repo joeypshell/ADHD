@@ -129,7 +129,10 @@
               <p class="eyebrow">Projects and rhythms</p>
               <h2 id="projectsTitle">Lists</h2>
             </div>
-            <select id="areaFilter" aria-label="Filter area"></select>
+            <div class="heading-actions">
+              <button class="secondary-button" id="openMapButton" type="button">Map</button>
+              <select id="areaFilter" aria-label="Filter area"></select>
+            </div>
           </div>
           <section class="stats-strip" aria-label="Board totals">
             <button class="stat-pill" type="button" data-filter-status="red">
@@ -151,6 +154,52 @@
           </section>
           <div class="chip-row" id="statusFilters"></div>
           <div class="project-list" id="projectList"></div>
+        </section>
+
+        <section class="view" id="rhythmsView" data-view-panel="rhythms" aria-labelledby="rhythmsTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Recurring life rails</p>
+              <h2 id="rhythmsTitle">Rhythms</h2>
+            </div>
+            <button class="secondary-button" type="button" data-add-rhythm>Add rhythm</button>
+          </div>
+          <section class="stats-strip rhythm-stats" aria-label="Rhythm totals">
+            <div class="stat-pill static-stat">
+              <span id="rhythmLateCount">0</span>
+              <span>Late</span>
+            </div>
+            <div class="stat-pill static-stat">
+              <span id="rhythmDueCount">0</span>
+              <span>Due</span>
+            </div>
+            <div class="stat-pill static-stat">
+              <span id="rhythmDoneCount">0</span>
+              <span>Done</span>
+            </div>
+            <div class="stat-pill static-stat">
+              <span id="rhythmTotalCount">0</span>
+              <span>Total</span>
+            </div>
+          </section>
+          <section class="rhythm-section" aria-labelledby="rhythmDueTitle">
+            <div class="section-heading small">
+              <h2 id="rhythmDueTitle">Due now</h2>
+            </div>
+            <div class="rhythm-list" id="rhythmDueList"></div>
+          </section>
+          <section class="rhythm-section" aria-labelledby="rhythmUpcomingTitle">
+            <div class="section-heading small">
+              <h2 id="rhythmUpcomingTitle">Coming up</h2>
+            </div>
+            <div class="rhythm-list compact-list" id="rhythmUpcomingList"></div>
+          </section>
+          <section class="rhythm-section" aria-labelledby="rhythmAllTitle">
+            <div class="section-heading small">
+              <h2 id="rhythmAllTitle">All rhythms</h2>
+            </div>
+            <div class="rhythm-list compact-list" id="rhythmAllList"></div>
+          </section>
         </section>
 
         <section class="view" id="mapView" data-view-panel="map" aria-labelledby="mapTitle">
@@ -182,13 +231,6 @@
               </div>
               <div class="mini-list" id="reviewList"></div>
             </section>
-            <section>
-              <div class="section-heading small">
-                <h2>Rhythms</h2>
-                <button class="secondary-button small-button" type="button" data-add-rhythm>Add rhythm</button>
-              </div>
-              <div class="recurring-list" id="recurringList"></div>
-            </section>
           </div>
         </section>
       </main>
@@ -196,8 +238,8 @@
       <nav class="bottom-nav" aria-label="Views">
         <button class="nav-button is-active" type="button" data-view="now">Today</button>
         <button class="nav-button" type="button" data-view="wizard">Add</button>
+        <button class="nav-button" type="button" data-view="rhythms">Rhythms</button>
         <button class="nav-button" type="button" data-view="projects">Lists</button>
-        <button class="nav-button" type="button" data-view="map">Map</button>
         <button class="nav-button" type="button" data-view="review">Review</button>
       </nav>
     </div>
@@ -342,6 +384,14 @@
           <label>
             Cadence
             <select id="editCadence"></select>
+          </label>
+          <label>
+            Last done
+            <input id="editLastDone" type="date">
+          </label>
+          <label>
+            Next due
+            <input id="editNextDue" type="date">
           </label>
           <label class="span-full">
             Trigger

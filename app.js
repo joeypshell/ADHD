@@ -331,10 +331,17 @@ const els = {
   wizardNextButton: document.querySelector("#wizardNextButton"),
   projectList: document.querySelector("#projectList"),
   areaFilter: document.querySelector("#areaFilter"),
+  openMapButton: document.querySelector("#openMapButton"),
   statusFilters: document.querySelector("#statusFilters"),
   clearFilterButton: document.querySelector("#clearFilterButton"),
   mindMap: document.querySelector("#mindMap"),
   mapFocus: document.querySelector("#mapFocus"),
+  rhythmLateCount: document.querySelector("#rhythmLateCount"),
+  rhythmDueCount: document.querySelector("#rhythmDueCount"),
+  rhythmDoneCount: document.querySelector("#rhythmDoneCount"),
+  rhythmTotalCount: document.querySelector("#rhythmTotalCount"),
+  rhythmUpcomingList: document.querySelector("#rhythmUpcomingList"),
+  rhythmAllList: document.querySelector("#rhythmAllList"),
   reviewList: document.querySelector("#reviewList"),
   recurringList: document.querySelector("#recurringList"),
   addRhythmButtons: document.querySelectorAll("[data-add-rhythm]"),
@@ -358,6 +365,8 @@ const els = {
   editEstimate: document.querySelector("#editEstimate"),
   editWaitingFor: document.querySelector("#editWaitingFor"),
   editCadence: document.querySelector("#editCadence"),
+  editLastDone: document.querySelector("#editLastDone"),
+  editNextDue: document.querySelector("#editNextDue"),
   editTrigger: document.querySelector("#editTrigger"),
   editMinimum: document.querySelector("#editMinimum"),
   editNextAction: document.querySelector("#editNextAction"),
@@ -1649,7 +1658,7 @@ function isOpen(item) {
 }
 
 function isUserVisibleItem(item) {
-  return !item.system && !item.starter;
+  return !item.system;
 }
 
 function hasActiveVisibleItems() {
@@ -2485,7 +2494,20 @@ function rhythmDueDays(item) {
   return dueDays === null ? 9999 : dueDays;
 }
 
+function rhythmStatus(item) {
+  if (isSnoozed(item)) return "snoozed";
+  if (item.lastDone === todayIso()) return "done";
+  if (item.status === "red") return "late";
+  if (item.status === "now") return "due";
+  const dueDays = rhythmDueDays(item);
+  if (dueDays < 0) return "late";
+  if (dueDays === 0) return "due";
+  if (dueDays === 9999) return "asneeded";
+  return "upcoming";
+}
+
 function rhythmDueLabel(item) {
+  if (isSnoozed(item)) return `snoozed until ${formatDateTime(item.snoozedUntil)}`;
   const dueDays = rhythmDueDays(item);
   if (item.lastDone === todayIso()) return "done today";
   if (dueDays === 9999) return "as needed";
@@ -2496,6 +2518,7 @@ function rhythmDueLabel(item) {
 }
 
 function rhythmBadgeText(item) {
+  if (isSnoozed(item)) return "snoozed";
   const dueDays = rhythmDueDays(item);
   if (item.lastDone === todayIso()) return "ok";
   if (dueDays < 0) return "late";
@@ -2504,28 +2527,55 @@ function rhythmBadgeText(item) {
   return `${dueDays}d`;
 }
 
+function visibleRhythms() {
+  return sortedItems(state.items.filter((item) => (
+    isRhythm(item)
+    && isUserVisibleItem(item)
+    && isOpen(item)
+    && itemMatchesMode(item)
+  )));
+}
+
 function rhythmsDue(limit = 5) {
-  return sortedItems(state.items.filter((item) => {
-    if (!isRhythm(item) || item.system || !isOpen(item) || isSnoozed(item) || !itemMatchesMode(item)) return false;
-    const dueDays = rhythmDueDays(item);
-    return dueDays <= 0 || item.status === "now" || item.status === "red";
-  })).slice(0, limit);
+  return visibleRhythms()
+    .filter((item) => ["late", "due"].includes(rhythmStatus(item)))
+    .slice(0, limit);
 }
 
 function renderRhythmsDue() {
   if (!els.rhythmDueList) return;
-  els.rhythmDueList.replaceChildren();
-  const items = rhythmsDue();
-  if (els.rhythmDueShell) els.rhythmDueShell.hidden = !items.length;
-  if (!items.length) {
-    return;
-  }
-  items.forEach((item) => els.rhythmDueList.append(makeRhythmDueCard(item)));
+  renderRhythmDashboard();
 }
 
-function makeRhythmDueCard(item) {
+function renderRhythmDashboard() {
+  const rhythms = visibleRhythms();
+  const due = rhythms.filter((item) => ["late", "due"].includes(rhythmStatus(item)));
+  const upcoming = rhythms.filter((item) => ["upcoming", "asneeded"].includes(rhythmStatus(item))).slice(0, 6);
+  const all = rhythms;
+
+  if (els.rhythmLateCount) els.rhythmLateCount.textContent = String(rhythms.filter((item) => rhythmStatus(item) === "late").length);
+  if (els.rhythmDueCount) els.rhythmDueCount.textContent = String(rhythms.filter((item) => rhythmStatus(item) === "due").length);
+  if (els.rhythmDoneCount) els.rhythmDoneCount.textContent = String(rhythms.filter((item) => rhythmStatus(item) === "done").length);
+  if (els.rhythmTotalCount) els.rhythmTotalCount.textContent = String(rhythms.length);
+
+  renderRhythmList(els.rhythmDueList, due, "Nothing due in this mode", false);
+  renderRhythmList(els.rhythmUpcomingList, upcoming, "Nothing coming up", true);
+  renderRhythmList(els.rhythmAllList, all, "No rhythms yet", true);
+}
+
+function renderRhythmList(container, items, emptyText, compact = false) {
+  if (!container) return;
+  container.replaceChildren();
+  if (!items.length) {
+    container.append(makeEmpty(emptyText));
+    return;
+  }
+  items.forEach((item) => container.append(makeRhythmCard(item, compact)));
+}
+
+function makeRhythmCard(item, compact = false) {
   const card = document.createElement("article");
-  card.className = `rhythm-card status-${item.status}`;
+  card.className = `rhythm-card rhythm-${rhythmStatus(item)} status-${item.status}${compact ? " is-compact" : ""}`;
 
   const top = document.createElement("div");
   top.className = "rhythm-card-top";
@@ -2557,6 +2607,10 @@ function makeRhythmDueCard(item) {
   actions.className = "rhythm-actions";
   actions.append(
     createButton("Done", "primary-button", () => completeRhythm(item.id)),
+    createButton("Make now", "secondary-button", () => {
+      updateItem(item.id, { status: "now", snoozedUntil: "", plannedFor: todayIso() });
+      showView("now");
+    }),
     createButton("Snooze", "secondary-button", () => snoozeItem(item.id, "tomorrow")),
     createButton("Edit", "ghost-button", () => openEdit(item.id))
   );
@@ -2785,10 +2839,10 @@ function reviewItems() {
 
 function renderReview() {
   renderMiniList(els.reviewList, reviewItems(), "No review items");
-  renderRecurring();
 }
 
 function renderRecurring() {
+  if (!els.recurringList) return;
   els.recurringList.replaceChildren();
   const rhythms = sortedItems(state.items.filter((item) => isRhythm(item) && isUserVisibleItem(item) && itemMatchesMode(item)));
   if (!rhythms.length) {
@@ -3004,6 +3058,8 @@ function openEdit(itemId) {
   els.editEstimate.value = String(item.estimate);
   els.editWaitingFor.value = item.waitingFor;
   els.editCadence.value = item.cadence || "weekly";
+  els.editLastDone.value = item.lastDone || "";
+  els.editNextDue.value = item.nextDue || "";
   els.editTrigger.value = item.trigger || "";
   els.editMinimum.value = item.minimum || "";
   els.editNextAction.value = item.nextAction;
@@ -3052,10 +3108,11 @@ function saveEdit(event) {
     due: els.editDue.value,
     review: els.editReview.value,
     cadence: normalizeKind(els.editKind.value) === "rhythm" ? els.editCadence.value : "",
+    lastDone: normalizeKind(els.editKind.value) === "rhythm" ? els.editLastDone.value : "",
     trigger: normalizeKind(els.editKind.value) === "rhythm" ? els.editTrigger.value.trim() : "",
     minimum: normalizeKind(els.editKind.value) === "rhythm" ? els.editMinimum.value.trim() || els.editNextAction.value.trim() : "",
     nextDue: normalizeKind(els.editKind.value) === "rhythm"
-      ? nextRhythmDue(getItem(id)?.lastDone || "", els.editCadence.value)
+      ? els.editNextDue.value || nextRhythmDue(els.editLastDone.value || getItem(id)?.lastDone || "", els.editCadence.value)
       : "",
     importance: Number(els.editImportance.value),
     dread: Number(els.editDread.value),
@@ -3311,25 +3368,9 @@ function handleStuckAction(action) {
 }
 
 function addRecurring() {
-  const title = prompt("Rhythm name");
-  if (!title || !title.trim()) return;
-  const cadence = prompt("Cadence", "Weekly") || "Weekly";
-  const trigger = prompt("Trigger", "Chosen day/time") || "";
-  const minimum = prompt("Minimum version", "Touch it for 5 minutes") || "";
-
-  addItem({
-    kind: "rhythm",
-    title: title.trim(),
-    status: "active",
-    area: dashboardMode() === "work" ? "Work" : "Unsorted",
-    mode: dashboardMode(),
-    timeWindow: "anytime",
-    cadence: normalizeCadence(cadence),
-    trigger: trigger.trim(),
-    minimum: minimum.trim(),
-    nextAction: minimum.trim() || "Touch it for 5 minutes",
-    steps: [minimum.trim() || "Touch it for 5 minutes"]
-  });
+  resetWizard("rhythm");
+  showAddMode("wizard");
+  showView("wizard");
 }
 
 function exportData() {
@@ -3360,7 +3401,8 @@ function importData(file) {
 }
 
 function showView(view) {
-  els.navButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.view === view));
+  const navView = view === "map" ? "projects" : view;
+  els.navButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.view === navView));
   els.views.forEach((panel) => panel.classList.toggle("is-active", panel.dataset.viewPanel === view));
 }
 
@@ -3433,6 +3475,7 @@ function bindEvents() {
     saveState();
     render();
   });
+  els.openMapButton.addEventListener("click", () => showView("map"));
 
   els.markReviewedButton.addEventListener("click", () => {
     state.lastReviewed = new Date().toISOString();
