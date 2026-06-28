@@ -290,6 +290,7 @@ let emptyWizardAutoOpened = false;
 let addMode = "capture";
 let focusTimerId = 0;
 let brainDumpCandidates = [];
+let captureFollowupItemId = "";
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -306,10 +307,12 @@ const els = {
   modeButtons: document.querySelectorAll("[data-mode-option]"),
   quickCaptureForm: document.querySelector("#quickCaptureForm"),
   quickCaptureInput: document.querySelector("#quickCaptureInput"),
+  quickCaptureFollowup: document.querySelector("#quickCaptureFollowup"),
   addChoiceButtons: document.querySelectorAll("[data-add-mode]"),
   addPanels: document.querySelectorAll("[data-add-panel]"),
   addCaptureForm: document.querySelector("#addCaptureForm"),
   addCaptureInput: document.querySelector("#addCaptureInput"),
+  addCaptureFollowup: document.querySelector("#addCaptureFollowup"),
   brainDumpInput: document.querySelector("#brainDumpInput"),
   extractBrainDumpButton: document.querySelector("#extractBrainDumpButton"),
   clearBrainDumpButton: document.querySelector("#clearBrainDumpButton"),
@@ -1813,6 +1816,36 @@ function completeRhythm(itemId) {
   render();
 }
 
+function undoCompleteItem(itemId) {
+  const item = getItem(itemId);
+  if (!item) return;
+  const now = new Date().toISOString();
+  clearFocusForItem(itemId);
+  if (isRhythm(item)) {
+    if (item.lastDone === todayIso()) item.lastDone = "";
+    item.nextDue = nextRhythmDue(item.lastDone, item.cadence);
+    item.status = "active";
+    item.completedAt = "";
+    item.plannedFor = todayIso();
+    item.snoozedUntil = "";
+    item.updatedAt = now;
+    item.lastTouched = now;
+    saveState();
+    render();
+    return;
+  }
+
+  item.status = "active";
+  item.completedAt = "";
+  item.plannedFor = todayIso();
+  item.snoozedUntil = "";
+  item.steps = item.steps.map((step) => ({ ...step, done: false }));
+  item.updatedAt = now;
+  item.lastTouched = now;
+  saveState();
+  render();
+}
+
 function isRhythm(item) {
   return item.kind === "rhythm";
 }
@@ -2871,16 +2904,36 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
   meta.className = "queue-meta";
   meta.textContent = [isCurrent ? "Next" : "", entry.reason, formatTimeWindow(item), doneToday ? "" : `${item.estimate} min`].filter(Boolean).join(" / ");
 
-  const doneButton = document.createElement("button");
-  doneButton.type = "button";
-  doneButton.className = "queue-done-button";
-  doneButton.textContent = "Done";
-  doneButton.disabled = doneToday;
-  doneButton.setAttribute("aria-label", `Mark ${item.title} done`);
-  doneButton.addEventListener("click", () => completeItem(item.id));
+  const actions = document.createElement("div");
+  actions.className = "queue-row-actions";
+  if (doneToday) {
+    const undoButton = document.createElement("button");
+    undoButton.type = "button";
+    undoButton.className = "queue-action-button queue-undo-button";
+    undoButton.textContent = "Undo";
+    undoButton.setAttribute("aria-label", `Undo completion for ${item.title}`);
+    undoButton.addEventListener("click", () => undoCompleteItem(item.id));
+    actions.append(undoButton);
+  } else {
+    const doingButton = document.createElement("button");
+    doingButton.type = "button";
+    doingButton.className = "queue-action-button queue-doing-button";
+    doingButton.textContent = item.status === "now" ? "Doing" : "Do";
+    doingButton.disabled = item.status === "now";
+    doingButton.setAttribute("aria-label", `Make ${item.title} the Doing item`);
+    doingButton.addEventListener("click", () => startDoingItem(item.id));
+
+    const doneButton = document.createElement("button");
+    doneButton.type = "button";
+    doneButton.className = "queue-action-button queue-done-button";
+    doneButton.textContent = "Done";
+    doneButton.setAttribute("aria-label", `Mark ${item.title} done`);
+    doneButton.addEventListener("click", () => completeItem(item.id));
+    actions.append(doingButton, doneButton);
+  }
 
   openButton.append(rank, copy, meta);
-  row.append(openButton, doneButton);
+  row.append(openButton, actions);
   return row;
 }
 
@@ -3334,21 +3387,88 @@ function populateFormSelects() {
 
 function captureLooseThing(title) {
   if (!title) return;
+  const tinyStart = suggestedTinyStart(title, "project");
   return addItem({
     title,
     status: "inbox",
     area: dashboardMode() === "work" ? "Work" : "Unsorted",
     mode: dashboardMode(),
+    nextAction: tinyStart,
+    steps: [tinyStart],
     plannedFor: "",
     review: ""
   });
 }
 
+function renderCaptureFollowups() {
+  [els.quickCaptureFollowup, els.addCaptureFollowup].forEach((panel) => {
+    if (!panel) return;
+    panel.replaceChildren();
+    const item = getItem(captureFollowupItemId);
+    panel.hidden = !item;
+    if (!item) return;
+
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "eyebrow";
+    eyebrow.textContent = "Tiny start";
+    const title = document.createElement("h3");
+    title.textContent = item.title;
+    const copy = document.createElement("p");
+    copy.textContent = "Make this easier to start later.";
+
+    const form = document.createElement("form");
+    form.className = "capture-followup-form";
+    const label = document.createElement("label");
+    label.className = "sr-only";
+    label.setAttribute("for", `${panel.id}Input`);
+    label.textContent = "Tiny start";
+    const input = document.createElement("input");
+    input.id = `${panel.id}Input`;
+    input.value = currentTinyStep(item);
+    input.autocomplete = "off";
+    const actions = document.createElement("div");
+    actions.className = "capture-followup-actions";
+    actions.append(
+      createButton("Save tiny start", "primary-button small-button", () => saveCaptureTinyStart(item.id, input.value)),
+      createButton("Skip", "secondary-button small-button", dismissCaptureFollowup)
+    );
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveCaptureTinyStart(item.id, input.value);
+    });
+    form.append(label, input, actions);
+    panel.append(eyebrow, title, copy, form);
+  });
+}
+
+function saveCaptureTinyStart(itemId, text) {
+  const item = getItem(itemId);
+  if (!item) return;
+  const tinyStart = text.trim() || currentTinyStep(item) || suggestedTinyStart(item.title, item.kind);
+  const steps = item.steps.length
+    ? item.steps.map((step, index) => (index === 0 ? { ...step, text: tinyStart } : step))
+    : [{ id: cryptoId(), text: tinyStart, done: false }];
+  updateItem(itemId, {
+    nextAction: tinyStart,
+    steps
+  });
+  captureFollowupItemId = "";
+  renderCaptureFollowups();
+}
+
+function dismissCaptureFollowup() {
+  captureFollowupItemId = "";
+  renderCaptureFollowups();
+}
+
 function quickCapture(event) {
   event.preventDefault();
   const title = els.quickCaptureInput.value.trim();
-  if (!captureLooseThing(title)) return;
+  const item = captureLooseThing(title);
+  if (!item) return;
+  captureFollowupItemId = item.id;
   els.quickCaptureInput.value = "";
+  renderCaptureFollowups();
 }
 
 function addCapture(event) {
@@ -3356,9 +3476,9 @@ function addCapture(event) {
   const title = els.addCaptureInput.value.trim();
   const item = captureLooseThing(title);
   if (!item) return;
+  captureFollowupItemId = item.id;
   els.addCaptureInput.value = "";
-  showView("now");
-  openDetail(item.id);
+  renderCaptureFollowups();
 }
 
 function splitBrainDump(text) {
@@ -4248,6 +4368,7 @@ function render() {
   showAddMode();
   renderLifeRailStarter();
   renderBrainDumpCandidates();
+  renderCaptureFollowups();
   renderTemplates();
   renderRecommendation();
   renderRhythmsDue();

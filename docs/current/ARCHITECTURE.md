@@ -124,14 +124,14 @@ Today:
 - sticky focus anchor when a Doing timer is active
 - recommendation card
 - visual timeline: Now / Next / Later / Missed
-- complete Today list
-- quick capture
+- complete Today list with direct Doing, Done, and same-day Undo actions
+- quick capture with a tiny-start follow-up
 
 Doing and timers are intentionally separate. `status: "now"` means the item is being worked on or should stay at the top; a `focusSession` exists only when the user explicitly starts the timer. Today and item detail use explicit snooze destinations: 15 minutes, 1 hour, tonight, or tomorrow.
 
 Add:
 
-- quick capture
+- quick capture with generated tiny starts and an optional clarification follow-up
 - rule-based brain-dump triage
 - templates
 - first-run life rail starter for Body, House, and Work anchors

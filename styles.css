@@ -760,6 +760,46 @@ textarea {
   box-shadow: none;
 }
 
+.capture-followup {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--green) 18%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--green-soft) 34%, #fff);
+}
+
+.capture-followup[hidden] {
+  display: none;
+}
+
+.capture-followup h3,
+.capture-followup p {
+  margin: 0;
+}
+
+.capture-followup h3 {
+  font-size: 1.05rem;
+  line-height: 1.18;
+}
+
+.capture-followup p:not(.eyebrow) {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.capture-followup-form {
+  display: grid;
+  gap: 8px;
+}
+
+.capture-followup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .template-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1648,7 +1688,7 @@ textarea {
 }
 
 .queue-open:focus-visible,
-.queue-done-button:focus-visible {
+.queue-action-button:focus-visible {
   outline: 3px solid var(--teal-soft);
   outline-offset: 3px;
 }
@@ -1737,34 +1777,56 @@ textarea {
   font-weight: 800;
 }
 
-.queue-done-button {
+.queue-row-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(46px, auto));
+  gap: 6px;
+}
+
+.queue-action-button {
   display: inline-grid;
-  min-width: 58px;
-  min-height: 42px;
+  min-width: 50px;
+  min-height: 38px;
   place-items: center;
-  padding: 0 10px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.queue-doing-button {
+  color: var(--teal);
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--teal) 24%, var(--line));
+}
+
+.queue-done-button,
+.queue-undo-button {
   color: var(--green);
   background: #fff;
   border: 1px solid color-mix(in srgb, var(--green) 24%, var(--line));
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 950;
 }
 
-.queue-done-button:disabled {
+.queue-action-button:disabled {
   color: var(--muted);
   background: color-mix(in srgb, var(--green-soft) 34%, #fff);
   border-color: var(--line);
   cursor: default;
 }
 
-.queue-done-button:hover {
+.queue-action-button:hover {
   color: #fff;
   background: var(--green);
   border-color: var(--green);
 }
 
-.queue-done-button:disabled:hover {
+.queue-doing-button:hover {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+.queue-action-button:disabled:hover {
   color: var(--muted);
   background: color-mix(in srgb, var(--green-soft) 34%, #fff);
   border-color: var(--line);
@@ -2758,6 +2820,16 @@ dialog::backdrop {
   .today-queue-row {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
+  }
+
+  .queue-row-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .queue-action-button {
+    min-width: 54px;
+    min-height: 34px;
+    padding-inline: 8px;
   }
 
   .queue-open {
