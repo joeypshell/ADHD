@@ -269,6 +269,7 @@ const els = {
   todayLabel: document.querySelector("#todayLabel"),
   todayModeLabel: document.querySelector("#todayModeLabel"),
   todayWindowLabel: document.querySelector("#todayWindowLabel"),
+  todayQueueCount: document.querySelector("#todayQueueCount"),
   todayQueueList: document.querySelector("#todayQueueList"),
   modeButtons: document.querySelectorAll("[data-mode-option]"),
   quickCaptureForm: document.querySelector("#quickCaptureForm"),
@@ -1772,6 +1773,10 @@ function isPlannedToday(item) {
   return item.plannedFor === todayIso();
 }
 
+function isCapturedToday(item) {
+  return item.status === "inbox" && String(item.createdAt || "").slice(0, 10) === todayIso();
+}
+
 function todayCandidateReason(item) {
   const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
   const reviewDays = daysUntil(item.review);
@@ -1780,6 +1785,7 @@ function todayCandidateReason(item) {
   if (item.status === "now") return "doing now";
   if (item.status === "red") return "red zone";
   if (isPlannedToday(item)) return "planned today";
+  if (isCapturedToday(item)) return "captured today";
   if (isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "rhythm overdue" : "rhythm due";
   if (!isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "overdue" : "due today";
   if (reviewDays !== null && reviewDays <= 0 && item.waitingFor.trim()) return "waiting checkback";
@@ -1812,8 +1818,12 @@ function todayQueueScore(item) {
   return score;
 }
 
-function todayQueueEntries(limit = 8, mode = dashboardMode()) {
-  const entries = state.items
+function limitEntries(entries, limit = Infinity) {
+  return Number.isFinite(limit) ? entries.slice(0, limit) : entries;
+}
+
+function todayCandidateEntries(mode = dashboardMode()) {
+  return state.items
     .filter((item) => isTodayCandidate(item, mode))
     .map((item) => ({
       item,
@@ -1821,12 +1831,18 @@ function todayQueueEntries(limit = 8, mode = dashboardMode()) {
       reason: todayCandidateReason(item)
     }))
     .sort((a, b) => b.score - a.score || sortDateValue(a.item).localeCompare(sortDateValue(b.item)));
+}
 
-  if (entries.length) return entries.slice(0, limit);
-
+function fallbackTodayEntries(limit = 1, mode = dashboardMode()) {
   return recommendedItems(mode)
     .slice(0, limit)
     .map((entry) => ({ ...entry, reason: "next active" }));
+}
+
+function todayQueueEntries(limit = Infinity, mode = dashboardMode()) {
+  const entries = todayCandidateEntries(mode);
+  if (entries.length) return limitEntries(entries, limit);
+  return fallbackTodayEntries(limit, mode);
 }
 
 function recommendedItems(mode = dashboardMode()) {
@@ -1992,7 +2008,8 @@ function createFromTemplate(template) {
 }
 
 function renderRecommendation() {
-  const entries = todayQueueEntries(8);
+  const todayEntries = todayCandidateEntries();
+  const entries = todayEntries.length ? todayEntries : fallbackTodayEntries(1);
   const [top] = entries;
   if (els.todayModeLabel) els.todayModeLabel.textContent = `${modeMeta().label} mode`;
   if (els.todayWindowLabel) {
@@ -2001,6 +2018,7 @@ function renderRecommendation() {
   }
   els.modeButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.modeOption === dashboardMode()));
   document.body.dataset.mode = dashboardMode();
+  if (els.todayQueueCount) els.todayQueueCount.textContent = `${todayEntries.length} ${todayEntries.length === 1 ? "task" : "tasks"}`;
   els.recommendationPanel.replaceChildren();
   if (els.todayQueueList) els.todayQueueList.replaceChildren();
 
@@ -2026,7 +2044,7 @@ function renderRecommendation() {
     body.append(title, copy, actions);
     panel.append(band, body);
     els.recommendationPanel.append(panel);
-    if (els.todayQueueList) els.todayQueueList.append(makeEmpty("Nothing queued for this mode"));
+    if (els.todayQueueList) els.todayQueueList.append(makeEmpty("Nothing has to be done today in this mode"));
     return;
   }
 
@@ -2124,20 +2142,20 @@ function renderRecommendation() {
   panel.append(band, body);
   els.recommendationPanel.append(panel);
   if (els.todayQueueList) {
-    const queue = entries.slice(1);
-    if (queue.length) {
-      queue.forEach((entry, index) => els.todayQueueList.append(makeTodayQueueRow(entry, index)));
+    if (todayEntries.length) {
+      todayEntries.forEach((entry, index) => els.todayQueueList.append(makeTodayQueueRow(entry, index, entry.item.id === item.id)));
     } else {
-      els.todayQueueList.append(makeEmpty("Nothing else is queued"));
+      els.todayQueueList.append(makeEmpty("No must-do items today"));
     }
   }
 }
 
-function makeTodayQueueRow(entry, index) {
+function makeTodayQueueRow(entry, index, isCurrent = false) {
   const item = entry.item;
   const row = document.createElement("button");
   row.type = "button";
-  row.className = `today-queue-row status-${item.status}`;
+  row.className = `today-queue-row status-${item.status}${isCurrent ? " is-current" : ""}`;
+  if (isCurrent) row.setAttribute("aria-current", "true");
   row.addEventListener("click", () => openDetail(item.id));
 
   const rank = document.createElement("span");
@@ -2154,7 +2172,7 @@ function makeTodayQueueRow(entry, index) {
 
   const meta = document.createElement("span");
   meta.className = "queue-meta";
-  meta.textContent = [entry.reason, formatTimeWindow(item), `${item.estimate} min`].filter(Boolean).join(" / ");
+  meta.textContent = [isCurrent ? "Next" : "", entry.reason, formatTimeWindow(item), `${item.estimate} min`].filter(Boolean).join(" / ");
 
   row.append(rank, copy, meta);
   return row;
