@@ -2,7 +2,7 @@
 
 A static, mobile-first command center for ADHD-style executive function support. It is built for GitHub Pages and runs without a build step.
 
-The primary screen is a Now cockpit: it recommends one clear action, shows recurring rhythms that are due, and keeps the Daily Launch / Shutdown loop tucked into a compact section. Projects, rhythms, map, wizard, and review are secondary views over the same local data.
+The primary screen is a Today cockpit: it recommends one clear action, shows a short priority queue, and keeps project/list/map/review views secondary over the same local data.
 
 The app has two lanes:
 
@@ -17,7 +17,7 @@ Daily Launch gives the day a shape:
 
 Shutdown captures what changed, shows open-loop counts, and marks the daily rhythm complete.
 
-The Wizard tab guides setup with three paths:
+The Add tab starts with three paths: Quick capture, Templates, and Wizard. The Wizard guides setup with three paths:
 
 - Project
 - Rhythm
@@ -45,6 +45,6 @@ Open `http://localhost:8080`.
 
 ## Data
 
-The app stores data in the browser with `localStorage`. Use the `DL` button to export a JSON backup and the `UP` button to import one.
+The app stores data in the browser with `localStorage`. Use the `...` backup menu to export or import a JSON backup.
 
 GitHub Pages is static, so it cannot save changes back to GitHub by itself. A future sync version would need a backend, a private database, or an authenticated storage provider.

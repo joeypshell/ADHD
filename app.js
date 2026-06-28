@@ -66,6 +66,7 @@ const STARTER_TEMPLATES = [
     description: "Minimum kitchen reset",
     kind: "rhythm",
     area: "Home / Admin",
+    mode: "home",
     cadence: "daily",
     timeWindow: "evening",
     estimate: 10,
@@ -81,6 +82,7 @@ const STARTER_TEMPLATES = [
     description: "Avoid the evening scramble",
     kind: "rhythm",
     area: "Home / Admin",
+    mode: "home",
     cadence: "daily",
     timeWindow: "afternoon",
     estimate: 10,
@@ -95,6 +97,7 @@ const STARTER_TEMPLATES = [
     description: "Morning body anchor",
     kind: "rhythm",
     area: "Body / Exercise",
+    mode: "home",
     cadence: "daily",
     timeWindow: "morning",
     estimate: 30,
@@ -109,6 +112,7 @@ const STARTER_TEMPLATES = [
     description: "Keep the car ready",
     kind: "rhythm",
     area: "Home / Admin",
+    mode: "home",
     cadence: "weekly",
     timeWindow: "anytime",
     estimate: 15,
@@ -123,6 +127,7 @@ const STARTER_TEMPLATES = [
     description: "Small home reset",
     kind: "rhythm",
     area: "Home / Admin",
+    mode: "home",
     cadence: "weekly",
     timeWindow: "morning",
     estimate: 15,
@@ -150,6 +155,7 @@ const STARTER_TEMPLATES = [
     description: "Portal, form, call, or booking",
     kind: "project",
     area: "Health / Medical",
+    mode: "home",
     timeWindow: "anytime",
     estimate: 15,
     importance: 5,
@@ -164,6 +170,7 @@ const STARTER_TEMPLATES = [
     description: "Rescue without spiraling",
     kind: "project",
     area: "Unsorted",
+    mode: "both",
     status: "red",
     timeWindow: "anytime",
     estimate: 10,
@@ -276,6 +283,7 @@ let state = loadState();
 let stuckItemId = "";
 let wizard = createWizardState("project");
 let emptyWizardAutoOpened = false;
+let addMode = "capture";
 let focusTimerId = 0;
 
 const els = {
@@ -287,11 +295,18 @@ const els = {
   planTodayButton: document.querySelector("#planTodayButton"),
   quickCaptureForm: document.querySelector("#quickCaptureForm"),
   quickCaptureInput: document.querySelector("#quickCaptureInput"),
+  addChoiceButtons: document.querySelectorAll("[data-add-mode]"),
+  addPanels: document.querySelectorAll("[data-add-panel]"),
+  addCaptureForm: document.querySelector("#addCaptureForm"),
+  addCaptureInput: document.querySelector("#addCaptureInput"),
   templateGrid: document.querySelector("#templateGrid"),
   dailyLaunchPanel: document.querySelector("#dailyLaunchPanel"),
   dailyShutdownPanel: document.querySelector("#dailyShutdownPanel"),
   recommendationPanel: document.querySelector("#recommendationPanel"),
   refreshNowButton: document.querySelector("#refreshNowButton"),
+  backupToolsButton: document.querySelector("#backupToolsButton"),
+  backupDialog: document.querySelector("#backupDialog"),
+  closeBackupButton: document.querySelector("#closeBackupButton"),
   exportButton: document.querySelector("#exportButton"),
   importButton: document.querySelector("#importButton"),
   importFile: document.querySelector("#importFile"),
@@ -960,6 +975,17 @@ function currentWizardStep() {
 function resetWizard(mode = "project") {
   wizard = createWizardState(mode);
   renderWizard();
+}
+
+function showAddMode(mode = addMode) {
+  addMode = ["capture", "template", "wizard"].includes(mode) ? mode : "capture";
+  els.addChoiceButtons.forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.addMode === addMode);
+  });
+  els.addPanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.addPanel === addMode);
+  });
+  if (els.resetWizardButton) els.resetWizardButton.hidden = addMode !== "wizard";
 }
 
 function wizardStepTitle(step) {
@@ -1745,6 +1771,16 @@ function recommendationReason(item) {
   return reasons.slice(0, 3);
 }
 
+function nextCardMeta(item, reason = "") {
+  const parts = [];
+  if (reason && reason !== "next active") parts.push(reason);
+  recommendationReason(item).forEach((entry) => {
+    if (entry !== item.area && !parts.includes(entry)) parts.push(entry);
+  });
+  if (!parts.length) parts.push(item.area);
+  return parts.slice(0, 3).join(" / ");
+}
+
 function isCreatedToday(item) {
   return String(item.createdAt || "").startsWith(todayIso());
 }
@@ -2268,7 +2304,7 @@ function renderRecommendation() {
 
   const meta = document.createElement("p");
   meta.className = "item-meta";
-  meta.textContent = [top.reason, itemMeta(item)].filter(Boolean).join(" / ");
+  meta.textContent = nextCardMeta(item, top.reason);
 
   const title = document.createElement("h3");
   title.textContent = item.title;
@@ -2449,6 +2485,25 @@ function rhythmDueDays(item) {
   return dueDays === null ? 9999 : dueDays;
 }
 
+function rhythmDueLabel(item) {
+  const dueDays = rhythmDueDays(item);
+  if (item.lastDone === todayIso()) return "done today";
+  if (dueDays === 9999) return "as needed";
+  if (dueDays < 0) return `${Math.abs(dueDays)}d overdue`;
+  if (dueDays === 0) return "due today";
+  if (dueDays === 1) return "due tomorrow";
+  return `due in ${dueDays}d`;
+}
+
+function rhythmBadgeText(item) {
+  const dueDays = rhythmDueDays(item);
+  if (item.lastDone === todayIso()) return "ok";
+  if (dueDays < 0) return "late";
+  if (dueDays === 0) return "due";
+  if (dueDays === 9999) return "as needed";
+  return `${dueDays}d`;
+}
+
 function rhythmsDue(limit = 5) {
   return sortedItems(state.items.filter((item) => {
     if (!isRhythm(item) || item.system || !isOpen(item) || isSnoozed(item) || !itemMatchesMode(item)) return false;
@@ -2477,11 +2532,9 @@ function makeRhythmDueCard(item) {
   const copy = document.createElement("div");
   const meta = document.createElement("p");
   meta.className = "item-meta";
-  const dueDays = rhythmDueDays(item);
-  const dueLabel = dueDays === 9999 ? "as needed" : dueDays < 0 ? `${Math.abs(dueDays)}d overdue` : dueDays === 0 ? "due today" : `due in ${dueDays}d`;
   meta.textContent = [
     cadenceMeta(item.cadence).label,
-    dueLabel,
+    rhythmDueLabel(item),
     item.lastDone ? `last ${formatDate(item.lastDone)}` : ""
   ].filter(Boolean).join(" / ");
   const title = document.createElement("h3");
@@ -2489,7 +2542,7 @@ function makeRhythmDueCard(item) {
   copy.append(meta, title);
   const badge = document.createElement("span");
   badge.className = "count-badge";
-  badge.textContent = dueDays < 0 ? "!" : "now";
+  badge.textContent = rhythmBadgeText(item);
   top.append(copy, badge);
 
   const minimum = document.createElement("div");
@@ -2754,14 +2807,14 @@ function renderRecurring() {
     const detail = document.createElement("p");
     detail.textContent = [
       cadenceMeta(item.cadence).label,
-      item.nextDue ? `Due ${formatDate(item.nextDue)}` : "No due date",
+      rhythmDueLabel(item),
       item.trigger || "No trigger",
       item.minimum || "No minimum"
     ].join(" / ");
     copy.append(title, detail);
     const badge = document.createElement("span");
     badge.className = "count-badge";
-    badge.textContent = item.lastDone === todayIso() ? "ok" : rhythmDueDays(item) < 0 ? "!" : "0";
+    badge.textContent = rhythmBadgeText(item);
     top.append(copy, badge);
 
     const actions = document.createElement("div");
@@ -2803,18 +2856,33 @@ function populateFormSelects() {
   populateSelect(els.editEstimate, ESTIMATES.map((n) => ({ id: String(n), label: `${n} min` })), "10");
 }
 
-function quickCapture(event) {
-  event.preventDefault();
-  const title = els.quickCaptureInput.value.trim();
+function captureLooseThing(title) {
   if (!title) return;
-  addItem({
+  return addItem({
     title,
     status: "inbox",
     area: dashboardMode() === "work" ? "Work" : "Unsorted",
     mode: dashboardMode(),
+    plannedFor: todayIso(),
     review: todayIso()
   });
+}
+
+function quickCapture(event) {
+  event.preventDefault();
+  const title = els.quickCaptureInput.value.trim();
+  if (!captureLooseThing(title)) return;
   els.quickCaptureInput.value = "";
+}
+
+function addCapture(event) {
+  event.preventDefault();
+  const title = els.addCaptureInput.value.trim();
+  const item = captureLooseThing(title);
+  if (!item) return;
+  els.addCaptureInput.value = "";
+  showView("now");
+  openDetail(item.id);
 }
 
 function openDetail(itemId) {
@@ -3304,6 +3372,7 @@ function maybeOpenEmptyWizard() {
   if (emptyWizardAutoOpened || currentView() !== "now") return;
   emptyWizardAutoOpened = true;
   resetWizard("project");
+  showAddMode("wizard");
   showView("wizard");
 }
 
@@ -3315,6 +3384,13 @@ function bindEvents() {
   }).format(new Date());
 
   els.quickCaptureForm.addEventListener("submit", quickCapture);
+  els.addCaptureForm.addEventListener("submit", addCapture);
+  els.addChoiceButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      showAddMode(button.dataset.addMode);
+      if (addMode === "wizard") resetWizard(wizard.mode);
+    });
+  });
   els.resetWizardButton.addEventListener("click", () => resetWizard(wizard.mode));
   els.wizardBackButton.addEventListener("click", wizardBack);
   els.wizardSkipButton.addEventListener("click", wizardSkip);
@@ -3365,6 +3441,8 @@ function bindEvents() {
   });
 
   els.addRhythmButtons.forEach((button) => button.addEventListener("click", addRecurring));
+  els.backupToolsButton.addEventListener("click", () => els.backupDialog.showModal());
+  els.closeBackupButton.addEventListener("click", () => els.backupDialog.close());
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", () => {
@@ -3416,6 +3494,7 @@ function render() {
   ensureTodayPlan();
   renderStats();
   renderWizard();
+  showAddMode();
   renderTemplates();
   renderDailyLoop();
   renderRecommendation();

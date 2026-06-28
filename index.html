@@ -17,9 +17,7 @@
           <h1>What do I do now?</h1>
         </div>
         <div class="topbar-actions">
-          <button class="icon-button" id="exportButton" type="button" aria-label="Export backup" title="Export backup">DL</button>
-          <button class="icon-button" id="importButton" type="button" aria-label="Import backup" title="Import backup">UP</button>
-          <input id="importFile" type="file" accept="application/json" hidden>
+          <button class="icon-button" id="backupToolsButton" type="button" aria-label="Backups and settings" title="Backups and settings">...</button>
         </div>
       </header>
 
@@ -75,7 +73,30 @@
             <h3>Looks like you have nothing active yet.</h3>
             <p>Add one project or rhythm and I will turn it into the next small step.</p>
           </section>
-          <section class="template-shelf" aria-labelledby="templatesTitle">
+          <section class="add-chooser" aria-label="Add choices">
+            <button class="add-choice is-selected" type="button" data-add-mode="capture">
+              <strong>Quick capture</strong>
+              <span>Get a loose thing out of your head.</span>
+            </button>
+            <button class="add-choice" type="button" data-add-mode="template">
+              <strong>Template</strong>
+              <span>Start from a common life rail.</span>
+            </button>
+            <button class="add-choice" type="button" data-add-mode="wizard">
+              <strong>Wizard</strong>
+              <span>Guide me through a messy thing.</span>
+            </button>
+          </section>
+          <section class="add-panel add-capture-panel is-active" id="addCapturePanel" data-add-panel="capture">
+            <p class="eyebrow">Fastest path</p>
+            <h3>Capture now, clarify later.</h3>
+            <form class="quick-capture add-capture" id="addCaptureForm">
+              <label class="sr-only" for="addCaptureInput">Capture a loose thing</label>
+              <input id="addCaptureInput" autocomplete="off" placeholder="Example: renew car sticker">
+              <button type="submit">Add</button>
+            </form>
+          </section>
+          <section class="template-shelf add-panel" aria-labelledby="templatesTitle" data-add-panel="template">
             <div class="section-heading small">
               <div>
                 <p class="eyebrow">Fast start</p>
@@ -84,7 +105,7 @@
             </div>
             <div class="template-grid" id="templateGrid"></div>
           </section>
-          <section class="wizard-card" aria-live="polite">
+          <section class="wizard-card add-panel" aria-live="polite" data-add-panel="wizard">
             <div class="wizard-progress">
               <div>
                 <p class="eyebrow" id="wizardModeLabel">Project</p>
@@ -163,8 +184,8 @@
             </section>
             <section>
               <div class="section-heading small">
-                <h2>Rhythm</h2>
-                <button class="secondary-button small-button" type="button" data-add-rhythm>Add</button>
+                <h2>Rhythms</h2>
+                <button class="secondary-button small-button" type="button" data-add-rhythm>Add rhythm</button>
               </div>
               <div class="recurring-list" id="recurringList"></div>
             </section>
@@ -180,6 +201,24 @@
         <button class="nav-button" type="button" data-view="review">Review</button>
       </nav>
     </div>
+
+    <dialog id="backupDialog">
+      <section class="dialog-card backup-card" aria-labelledby="backupTitle">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">Data</p>
+            <h2 id="backupTitle">Backups</h2>
+          </div>
+          <button class="icon-button" type="button" id="closeBackupButton" aria-label="Close">x</button>
+        </div>
+        <p class="dialog-copy">This version saves on this browser. Export a backup before switching phones, clearing browser data, or experimenting heavily.</p>
+        <div class="backup-actions">
+          <button class="primary-button" id="exportButton" type="button">Export backup</button>
+          <button class="secondary-button" id="importButton" type="button">Import backup</button>
+          <input id="importFile" type="file" accept="application/json" hidden>
+        </div>
+      </section>
+    </dialog>
 
     <dialog id="detailDialog">
       <section class="dialog-card detail-card" aria-labelledby="detailTitle">
