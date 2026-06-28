@@ -196,10 +196,13 @@ const DEFAULT_DATA = {
   version: 5,
   createdAt: new Date().toISOString(),
   lastReviewed: "",
+  lastBackupAt: "",
   mode: "home",
   filter: { area: "all", status: "" },
   todayPlan: createDailyPlan(),
   focusSession: null,
+  dailyCheckin: createDailyCheckin(),
+  alerts: createAlertSettings(),
   items: DEFAULT_RHYTHMS.map((rhythm) => createRhythmItem(rhythm)),
   recurring: []
 };
@@ -264,11 +267,16 @@ let wizard = createWizardState("project");
 let emptyWizardAutoOpened = false;
 let addMode = "capture";
 let focusTimerId = 0;
+let brainDumpCandidates = [];
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
   todayModeLabel: document.querySelector("#todayModeLabel"),
   todayWindowLabel: document.querySelector("#todayWindowLabel"),
+  focusAnchor: document.querySelector("#focusAnchor"),
+  energyButtons: document.querySelectorAll("[data-energy]"),
+  brainButtons: document.querySelectorAll("[data-brain]"),
+  clearCheckinButton: document.querySelector("#clearCheckinButton"),
   todayTimeline: document.querySelector("#todayTimeline"),
   todayQueueCount: document.querySelector("#todayQueueCount"),
   todayQueueList: document.querySelector("#todayQueueList"),
@@ -279,11 +287,19 @@ const els = {
   addPanels: document.querySelectorAll("[data-add-panel]"),
   addCaptureForm: document.querySelector("#addCaptureForm"),
   addCaptureInput: document.querySelector("#addCaptureInput"),
+  brainDumpInput: document.querySelector("#brainDumpInput"),
+  extractBrainDumpButton: document.querySelector("#extractBrainDumpButton"),
+  clearBrainDumpButton: document.querySelector("#clearBrainDumpButton"),
+  brainCandidateList: document.querySelector("#brainCandidateList"),
+  saveBrainDumpButton: document.querySelector("#saveBrainDumpButton"),
   templateGrid: document.querySelector("#templateGrid"),
   recommendationPanel: document.querySelector("#recommendationPanel"),
   refreshNowButton: document.querySelector("#refreshNowButton"),
   backupToolsButton: document.querySelector("#backupToolsButton"),
   backupDialog: document.querySelector("#backupDialog"),
+  backupStatus: document.querySelector("#backupStatus"),
+  rhythmAlertButton: document.querySelector("#rhythmAlertButton"),
+  alertStatus: document.querySelector("#alertStatus"),
   closeBackupButton: document.querySelector("#closeBackupButton"),
   exportButton: document.querySelector("#exportButton"),
   importButton: document.querySelector("#importButton"),
@@ -410,6 +426,21 @@ function createDailyPlan(date = todayIso()) {
     backupItemId: "",
     minimumText: "",
     shutdownNote: ""
+  };
+}
+
+function createDailyCheckin(date = todayIso()) {
+  return {
+    date,
+    energy: "",
+    brain: ""
+  };
+}
+
+function createAlertSettings() {
+  return {
+    rhythmEnabled: false,
+    rhythmNotifiedKey: ""
   };
 }
 
@@ -660,11 +691,14 @@ function normalizeData(data) {
   const normalized = {
     ...cloneData(DEFAULT_DATA),
     ...data,
-    version: 5,
+    version: 6,
+    lastBackupAt: data.lastBackupAt || "",
     mode: DASHBOARD_MODES.some((mode) => mode.id === data.mode) ? data.mode : "home",
     filter: { area: "all", status: "", kind: "", ...(data.filter || {}) },
     todayPlan: normalizeDailyPlan(data.todayPlan),
     focusSession: normalizeFocusSession(data.focusSession),
+    dailyCheckin: normalizeDailyCheckin(data.dailyCheckin),
+    alerts: normalizeAlertSettings(data.alerts),
     items: [...sourceItems, ...migratedRhythms],
     recurring: []
   };
@@ -791,6 +825,23 @@ function normalizeDailyPlan(plan = {}) {
   };
 }
 
+function normalizeDailyCheckin(checkin = {}) {
+  const today = todayIso();
+  if (!checkin || checkin.date !== today) return createDailyCheckin(today);
+  return {
+    date: today,
+    energy: ["low", "medium", "high"].includes(checkin.energy) ? checkin.energy : "",
+    brain: ["clear", "foggy", "avoiding", "overloaded"].includes(checkin.brain) ? checkin.brain : ""
+  };
+}
+
+function normalizeAlertSettings(alerts = {}) {
+  return {
+    rhythmEnabled: Boolean(alerts?.rhythmEnabled),
+    rhythmNotifiedKey: alerts?.rhythmNotifiedKey || ""
+  };
+}
+
 function normalizeFocusSession(session = null) {
   if (!session || typeof session !== "object") return null;
   const itemId = String(session.itemId || "").trim();
@@ -814,6 +865,13 @@ function ensureTodayPlan() {
   const current = normalizeDailyPlan(state.todayPlan);
   if (JSON.stringify(current) === JSON.stringify(state.todayPlan)) return;
   state.todayPlan = current;
+  saveState();
+}
+
+function ensureDailyCheckin() {
+  const current = normalizeDailyCheckin(state.dailyCheckin);
+  if (JSON.stringify(current) === JSON.stringify(state.dailyCheckin)) return;
+  state.dailyCheckin = current;
   saveState();
 }
 
@@ -959,7 +1017,7 @@ function resetWizard(mode = "project") {
 }
 
 function showAddMode(mode = addMode) {
-  addMode = ["capture", "template", "wizard"].includes(mode) ? mode : "capture";
+  addMode = ["capture", "brain", "template", "wizard"].includes(mode) ? mode : "capture";
   els.addChoiceButtons.forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.addMode === addMode);
   });
@@ -1738,6 +1796,43 @@ function scoreItem(item) {
   return score;
 }
 
+function checkinScoreAdjustment(item) {
+  const checkin = normalizeDailyCheckin(state.dailyCheckin);
+  let score = 0;
+
+  if (checkin.energy === "low") {
+    if (item.estimate <= 10) score += 24;
+    if (isRhythm(item)) score += 18;
+    if (item.dread >= 5 && item.estimate > 15) score -= 12;
+  } else if (checkin.energy === "high") {
+    if (item.status === "red") score += 18;
+    if (item.importance >= 4) score += 16;
+    if (item.estimate >= 30 && item.dread <= 3) score += 10;
+  } else if (checkin.energy === "medium") {
+    if (item.estimate <= 15) score += 6;
+  }
+
+  if (checkin.brain === "foggy") {
+    if (item.estimate <= 10) score += 18;
+    if (currentTinyStep(item).length <= 42) score += 10;
+    if (item.steps.length <= 2) score += 8;
+  } else if (checkin.brain === "avoiding") {
+    if (item.status === "red") score += 14;
+    if (item.consequence.trim()) score += 12;
+    if (item.estimate <= 10) score += 16;
+    score += Math.min(14, item.dread * 2);
+  } else if (checkin.brain === "overloaded") {
+    if (isRhythm(item)) score += 18;
+    if (item.estimate <= 10) score += 22;
+    if (item.status === "waiting") score += 10;
+    if (item.estimate >= 30) score -= 16;
+  } else if (checkin.brain === "clear") {
+    if (item.importance >= 4) score += 8;
+  }
+
+  return score;
+}
+
 function recommendationReason(item) {
   const reasons = [];
   const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
@@ -1817,6 +1912,7 @@ function todayQueueScore(item) {
   if (window.state === "current") score += 24;
   if (window.state === "upcoming") score += 10;
   if (window.state === "missed") score += 14;
+  score += checkinScoreAdjustment(item);
   return score;
 }
 
@@ -2074,6 +2170,59 @@ function makeFocusPill(item) {
   return pill;
 }
 
+function renderFocusAnchor() {
+  if (!els.focusAnchor) return;
+  const session = activeFocusSession();
+  const item = session ? getItem(session.itemId) : null;
+  els.focusAnchor.replaceChildren();
+  els.focusAnchor.hidden = !session || !item;
+  if (!session || !item) return;
+
+  const remaining = sessionRemainingMs(session);
+  const durationMs = Math.max(1, Number(session.durationMinutes || 10) * 60000);
+  const completePercent = Math.min(100, Math.max(0, ((durationMs - remaining) / durationMs) * 100));
+
+  const main = document.createElement("button");
+  main.type = "button";
+  main.className = "focus-anchor-main";
+  main.addEventListener("click", openFocusDialog);
+
+  const label = document.createElement("span");
+  label.className = "focus-anchor-label";
+  label.textContent = session.running ? "Doing now" : remaining <= 0 ? "Time up" : "Paused";
+  const title = document.createElement("strong");
+  title.textContent = item.title;
+  const step = document.createElement("span");
+  step.className = "focus-anchor-step";
+  step.textContent = currentTinyStep(item);
+  main.append(label, title, step);
+
+  const time = document.createElement("button");
+  time.type = "button";
+  time.className = "focus-anchor-time";
+  time.dataset.focusRemaining = item.id;
+  time.textContent = focusSessionStateText(session);
+  time.addEventListener("click", openFocusDialog);
+
+  const progress = document.createElement("div");
+  progress.className = "progress-line focus-anchor-line";
+  progress.setAttribute("aria-hidden", "true");
+  const progressBar = document.createElement("span");
+  progressBar.style.width = `${completePercent}%`;
+  progress.append(progressBar);
+
+  const actions = document.createElement("div");
+  actions.className = "focus-anchor-actions";
+  actions.append(
+    createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button small-button", completeFocusSession),
+    createButton(session.running ? "Pause" : "Resume", "secondary-button small-button", pauseFocusSession),
+    createButton("Snooze", "secondary-button small-button", snoozeFocusSession),
+    createButton("+5 min", "secondary-button small-button", () => extendFocusSession(5))
+  );
+
+  els.focusAnchor.append(main, time, progress, actions);
+}
+
 function templateMode(template) {
   return template.mode || dashboardMode();
 }
@@ -2119,6 +2268,35 @@ function createFromTemplate(template) {
   render();
   showView("now");
   openDetail(item.id);
+}
+
+function renderCheckin() {
+  const checkin = normalizeDailyCheckin(state.dailyCheckin);
+  els.energyButtons.forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.energy === checkin.energy);
+    button.setAttribute("aria-pressed", button.dataset.energy === checkin.energy ? "true" : "false");
+  });
+  els.brainButtons.forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.brain === checkin.brain);
+    button.setAttribute("aria-pressed", button.dataset.brain === checkin.brain ? "true" : "false");
+  });
+  if (els.clearCheckinButton) els.clearCheckinButton.hidden = !checkin.energy && !checkin.brain;
+}
+
+function setCheckin(patch) {
+  state.dailyCheckin = {
+    ...normalizeDailyCheckin(state.dailyCheckin),
+    date: todayIso(),
+    ...patch
+  };
+  saveState();
+  render();
+}
+
+function clearCheckin() {
+  state.dailyCheckin = createDailyCheckin();
+  saveState();
+  render();
 }
 
 function renderRecommendation() {
@@ -2781,6 +2959,136 @@ function addCapture(event) {
   openDetail(item.id);
 }
 
+function splitBrainDump(text) {
+  return String(text || "")
+    .split(/\r?\n|;|(?:\.\s+)/)
+    .map((entry) => entry.replace(/^[-*0-9.)\s]+/, "").trim())
+    .filter((entry) => entry.length >= 3)
+    .slice(0, 20);
+}
+
+function inferBrainKind(text) {
+  const lower = text.toLowerCase();
+  if (/\b(daily|weekly|monthly|every|each|routine|habit|always)\b/.test(lower)) return "rhythm";
+  if (/\b(overdue|late|urgent|scary|avoid|avoiding|panic|rescue|red)\b/.test(lower)) return "rescue";
+  if (/\b(maybe|someday|later|eventually|idea)\b/.test(lower)) return "later";
+  return "project";
+}
+
+function suggestedTinyStart(text, kind) {
+  const lower = text.toLowerCase();
+  if (kind === "rhythm") return `Do the smallest version of ${text}`;
+  if (kind === "rescue") return "Open this for 5 minutes";
+  if (lower.includes("call")) return "Find the phone number";
+  if (lower.includes("email") || lower.includes("message")) return "Open a blank message";
+  if (lower.includes("clean")) return "Clear one visible surface";
+  if (lower.includes("write")) return "Open the document";
+  if (lower.includes("pay")) return "Open the bill or account";
+  return "Define the next visible action";
+}
+
+function extractBrainDump() {
+  const lines = splitBrainDump(els.brainDumpInput.value);
+  brainDumpCandidates = lines.map((text) => {
+    const kind = inferBrainKind(text);
+    return {
+      id: cryptoId(),
+      selected: true,
+      title: text,
+      kind,
+      tiny: suggestedTinyStart(text, kind)
+    };
+  });
+  renderBrainDumpCandidates();
+}
+
+function updateBrainCandidate(id, patch) {
+  brainDumpCandidates = brainDumpCandidates.map((candidate) => {
+    if (candidate.id !== id) return candidate;
+    const next = { ...candidate, ...patch };
+    if (patch.kind && !patch.tiny) next.tiny = suggestedTinyStart(next.title, next.kind);
+    return next;
+  });
+  renderBrainDumpCandidates();
+}
+
+function renderBrainDumpCandidates() {
+  if (!els.brainCandidateList) return;
+  els.brainCandidateList.replaceChildren();
+  if (els.saveBrainDumpButton) els.saveBrainDumpButton.hidden = !brainDumpCandidates.length;
+  if (!brainDumpCandidates.length) {
+    els.brainCandidateList.append(makeEmpty("Paste a few thoughts, then tap Find tasks"));
+    return;
+  }
+
+  brainDumpCandidates.forEach((candidate) => {
+    const row = document.createElement("article");
+    row.className = "brain-candidate";
+
+    const keep = document.createElement("input");
+    keep.type = "checkbox";
+    keep.checked = candidate.selected;
+    keep.addEventListener("change", () => updateBrainCandidate(candidate.id, { selected: keep.checked }));
+
+    const title = document.createElement("input");
+    title.value = candidate.title;
+    title.addEventListener("change", () => updateBrainCandidate(candidate.id, {
+      title: title.value.trim() || candidate.title,
+      tiny: suggestedTinyStart(title.value.trim() || candidate.title, candidate.kind)
+    }));
+
+    const kind = document.createElement("select");
+    [
+      { id: "project", label: "Project" },
+      { id: "rhythm", label: "Rhythm" },
+      { id: "rescue", label: "Rescue" },
+      { id: "later", label: "Later" }
+    ].forEach((option) => kind.append(new Option(option.label, option.id, false, option.id === candidate.kind)));
+    kind.addEventListener("change", () => updateBrainCandidate(candidate.id, { kind: kind.value }));
+
+    const tiny = document.createElement("input");
+    tiny.value = candidate.tiny;
+    tiny.addEventListener("change", () => updateBrainCandidate(candidate.id, { tiny: tiny.value.trim() || candidate.tiny }));
+
+    const remove = createButton("x", "icon-button small", () => {
+      brainDumpCandidates = brainDumpCandidates.filter((entry) => entry.id !== candidate.id);
+      renderBrainDumpCandidates();
+    });
+
+    row.append(keep, title, kind, tiny, remove);
+    els.brainCandidateList.append(row);
+  });
+}
+
+function saveBrainDumpCandidates() {
+  const selected = brainDumpCandidates.filter((candidate) => candidate.selected && candidate.title.trim());
+  selected.forEach((candidate) => {
+    const kind = candidate.kind === "rhythm" ? "rhythm" : "project";
+    const status = candidate.kind === "rescue" ? "red" : candidate.kind === "later" ? "later" : kind === "rhythm" ? "active" : "active";
+    addItem({
+      title: candidate.title.trim(),
+      kind,
+      status,
+      mode: dashboardMode(),
+      area: dashboardMode() === "work" ? "Work" : "Unsorted",
+      cadence: kind === "rhythm" ? "weekly" : "",
+      nextDue: kind === "rhythm" ? todayIso() : "",
+      timeWindow: "anytime",
+      nextAction: candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind),
+      minimum: kind === "rhythm" ? candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind) : "",
+      consequence: candidate.kind === "rescue" ? "Rescue this before it grows" : "",
+      estimate: candidate.kind === "rescue" ? 10 : 15,
+      importance: candidate.kind === "rescue" ? 5 : 3,
+      dread: candidate.kind === "rescue" ? 5 : 3,
+      steps: [candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind)]
+    });
+  });
+  brainDumpCandidates = [];
+  if (els.brainDumpInput) els.brainDumpInput.value = "";
+  renderBrainDumpCandidates();
+  showView("now");
+}
+
 function openDetail(itemId) {
   const item = getItem(itemId);
   if (!item || !els.detailDialog) return;
@@ -3042,7 +3350,10 @@ function openFocusDialog() {
 function updateFocusDisplays() {
   const session = activeFocusSession();
   const item = session ? getItem(session.itemId) : null;
-  if (!session || !item) return;
+  if (!session || !item) {
+    renderFocusAnchor();
+    return;
+  }
   const remaining = sessionRemainingMs(session);
   const durationMs = Math.max(1, Number(session.durationMinutes || 10) * 60000);
   const completePercent = Math.min(100, Math.max(0, ((durationMs - remaining) / durationMs) * 100));
@@ -3052,6 +3363,7 @@ function updateFocusDisplays() {
   document.querySelectorAll("[data-focus-remaining]").forEach((node) => {
     node.textContent = stateText;
   });
+  renderFocusAnchor();
 
   if (!els.focusDialog.open) return;
   els.focusMeta.textContent = itemMeta(item);
@@ -3218,7 +3530,43 @@ function addRecurring() {
   showView("wizard");
 }
 
+function backupAgeText() {
+  const date = toDate(state.lastBackupAt);
+  if (!date) return "No backup exported from this browser yet.";
+  const days = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (days <= 0) return "Last backup: today.";
+  if (days === 1) return "Last backup: yesterday.";
+  return `Last backup: ${days} days ago.`;
+}
+
+function renderBackupStatus() {
+  if (els.backupStatus) {
+    const date = toDate(state.lastBackupAt);
+    const stale = !date || Date.now() - date.getTime() > 7 * 86400000;
+    els.backupStatus.className = `backup-status${stale ? " needs-backup" : ""}`;
+    els.backupStatus.textContent = `${backupAgeText()} ${stale ? "Export before switching devices or clearing browser data." : "You have a recent local export marker."}`;
+  }
+
+  const canNotify = "Notification" in window;
+  if (els.rhythmAlertButton) {
+    els.rhythmAlertButton.hidden = !canNotify;
+    els.rhythmAlertButton.disabled = canNotify && Notification.permission === "denied";
+    if (!canNotify) els.rhythmAlertButton.textContent = "Alerts unavailable";
+    else if (Notification.permission === "denied") els.rhythmAlertButton.textContent = "Alerts blocked";
+    else if (state.alerts?.rhythmEnabled) els.rhythmAlertButton.textContent = "Due alerts on";
+    else els.rhythmAlertButton.textContent = "Enable due alerts";
+  }
+  if (els.alertStatus) {
+    if (!canNotify) els.alertStatus.textContent = "This browser does not support notifications.";
+    else if (Notification.permission === "denied") els.alertStatus.textContent = "Notifications are blocked in this browser.";
+    else if (state.alerts?.rhythmEnabled) els.alertStatus.textContent = "Due rhythm alerts are on for this browser. They are gentle and rate-limited.";
+    else els.alertStatus.textContent = "Alerts are optional and depend on this browser allowing notifications.";
+  }
+}
+
 function exportData() {
+  state.lastBackupAt = new Date().toISOString();
+  saveState();
   const snapshot = JSON.stringify(state, null, 2);
   const blob = new Blob([snapshot], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -3227,6 +3575,7 @@ function exportData() {
   link.download = `life-command-center-${todayIso()}.json`;
   link.click();
   URL.revokeObjectURL(url);
+  renderBackupStatus();
 }
 
 function importData(file) {
@@ -3238,11 +3587,52 @@ function importData(file) {
       state = next;
       saveState();
       render();
+      renderBackupStatus();
     } catch {
       alert("That file was not a valid command center backup.");
     }
   });
   reader.readAsText(file);
+}
+
+function rhythmAlertKey() {
+  return `${todayIso()}-${dashboardMode()}-${currentTimeWindowId()}`;
+}
+
+function dueRhythmAlertItems() {
+  return state.items.filter((item) => {
+    if (!isRhythm(item) || !isOpen(item) || isSnoozed(item) || !itemMatchesMode(item)) return false;
+    const dueDays = daysUntil(item.nextDue);
+    const window = timeWindowStatus(item);
+    return dueDays !== null && dueDays <= 0 && (window.state === "current" || item.timeWindow === "anytime");
+  });
+}
+
+function maybeSendRhythmDueAlert() {
+  if (!state.alerts?.rhythmEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
+  const key = rhythmAlertKey();
+  if (state.alerts.rhythmNotifiedKey === key) return;
+  const items = dueRhythmAlertItems();
+  if (!items.length) return;
+  state.alerts.rhythmNotifiedKey = key;
+  const [first] = items;
+  new Notification("Rhythm due now", {
+    body: items.length === 1 ? first.title : `${first.title} and ${items.length - 1} more`
+  });
+  saveState();
+}
+
+async function enableRhythmAlerts() {
+  if (!("Notification" in window)) return;
+  let permission = Notification.permission;
+  if (permission === "default") permission = await Notification.requestPermission();
+  state.alerts = {
+    ...normalizeAlertSettings(state.alerts),
+    rhythmEnabled: permission === "granted"
+  };
+  saveState();
+  renderBackupStatus();
+  maybeSendRhythmDueAlert();
 }
 
 function showView(view) {
@@ -3272,6 +3662,20 @@ function bindEvents() {
 
   els.quickCaptureForm.addEventListener("submit", quickCapture);
   els.addCaptureForm.addEventListener("submit", addCapture);
+  els.extractBrainDumpButton.addEventListener("click", extractBrainDump);
+  els.clearBrainDumpButton.addEventListener("click", () => {
+    brainDumpCandidates = [];
+    els.brainDumpInput.value = "";
+    renderBrainDumpCandidates();
+  });
+  els.saveBrainDumpButton.addEventListener("click", saveBrainDumpCandidates);
+  els.energyButtons.forEach((button) => button.addEventListener("click", () => {
+    setCheckin({ energy: state.dailyCheckin?.energy === button.dataset.energy ? "" : button.dataset.energy });
+  }));
+  els.brainButtons.forEach((button) => button.addEventListener("click", () => {
+    setCheckin({ brain: state.dailyCheckin?.brain === button.dataset.brain ? "" : button.dataset.brain });
+  }));
+  els.clearCheckinButton.addEventListener("click", clearCheckin);
   els.addChoiceButtons.forEach((button) => {
     button.addEventListener("click", () => {
       showAddMode(button.dataset.addMode);
@@ -3328,10 +3732,14 @@ function bindEvents() {
   });
 
   els.addRhythmButtons.forEach((button) => button.addEventListener("click", addRecurring));
-  els.backupToolsButton.addEventListener("click", () => els.backupDialog.showModal());
+  els.backupToolsButton.addEventListener("click", () => {
+    renderBackupStatus();
+    els.backupDialog.showModal();
+  });
   els.closeBackupButton.addEventListener("click", () => els.backupDialog.close());
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
+  els.rhythmAlertButton.addEventListener("click", enableRhythmAlerts);
   els.importFile.addEventListener("change", () => {
     const [file] = els.importFile.files;
     if (file) importData(file);
@@ -3373,9 +3781,12 @@ function bindEvents() {
 
 function render() {
   ensureTodayPlan();
+  ensureDailyCheckin();
   renderStats();
+  renderCheckin();
   renderWizard();
   showAddMode();
+  renderBrainDumpCandidates();
   renderTemplates();
   renderRecommendation();
   renderRhythmsDue();
@@ -3384,7 +3795,9 @@ function render() {
   renderProjects();
   renderMap();
   renderReview();
+  renderBackupStatus();
   syncFocusTimer();
+  maybeSendRhythmDueAlert();
   maybeOpenEmptyWizard();
 }
 

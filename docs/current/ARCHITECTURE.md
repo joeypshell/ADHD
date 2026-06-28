@@ -36,10 +36,13 @@ The main state object contains:
 - `version`
 - `createdAt`
 - `lastReviewed`
+- `lastBackupAt`
 - `mode`
 - `filter`
 - `todayPlan`
 - `focusSession`
+- `dailyCheckin`
+- `alerts`
 - `items`
 - `recurring`
 
@@ -80,6 +83,13 @@ Items enter Today when they are:
 
 The top recommendation comes from deterministic scoring in `todayQueueScore()`. The complete list comes from `todayCandidateEntries()`.
 
+The optional daily check-in can adjust scoring for the current day:
+
+- energy: low, medium, high
+- brain state: clear, foggy, avoiding, overloaded
+
+The check-in is local and resets when stale.
+
 ## Time Windows
 
 Time windows are simple bands:
@@ -97,6 +107,8 @@ Missed time-window items stay visible instead of disappearing.
 Today:
 
 - mode switch
+- energy/brain-state check-in
+- sticky focus anchor when a Doing timer is active
 - recommendation card
 - visual timeline: Now / Next / Later / Missed
 - complete Today list
@@ -105,6 +117,7 @@ Today:
 Add:
 
 - quick capture
+- rule-based brain-dump triage
 - templates
 - wizard for project, rhythm, or rescue
 
@@ -137,6 +150,34 @@ Focus state is stored in `state.focusSession`. It tracks:
 
 The Today recommendation card can start, pause, resume, snooze, and complete focus sessions. Notifications are limited to focus-timer permission and do not yet cover a broader reminder system.
 
+An active focus session also renders a sticky Today anchor with:
+
+- current task
+- tiny step
+- remaining time
+- progress
+- Done step / Pause / Snooze / +5 min
+
+## Notifications
+
+Notification permission is user-initiated. The app can:
+
+- notify when an enabled focus timer ends
+- optionally send rate-limited due-rhythm alerts for the current browser
+
+Notifications are not native push, widgets, live activities, or watch support.
+
+## Brain Dump Triage
+
+The Add view includes a rule-based brain dump flow:
+
+- split pasted text into candidate tasks
+- infer Project / Rhythm / Rescue / Later
+- suggest tiny starts
+- require user confirmation before saving
+
+No AI is involved in this flow yet.
+
 ## Rendering
 
 Rendering is currently vanilla DOM code in `app.js`.
@@ -144,7 +185,10 @@ Rendering is currently vanilla DOM code in `app.js`.
 Key render functions:
 
 - `renderRecommendation()`
+- `renderFocusAnchor()`
+- `renderCheckin()`
 - `renderTodayTimeline()`
+- `renderBrainDumpCandidates()`
 - `renderRhythmsDue()`
 - `renderProjects()`
 - `renderMap()`
@@ -165,7 +209,6 @@ This is acceptable for now, but large features should avoid making `renderRecomm
 - No cloud storage.
 - No voice-to-text capture.
 - No AI-backed task extraction or prioritization.
-- No broad reminders/notifications.
+- No native or cross-device reminder system.
 - No full calendar integration.
 - No automated browser test suite committed to the repo.
-

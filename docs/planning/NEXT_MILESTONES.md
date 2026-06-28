@@ -18,14 +18,20 @@ It should not become a generic planner/calendar. Automatic decision support is t
 - Row-level completion from Today.
 - Visual Today timeline using Now / Next / Later / Missed.
 - Home/Work mode filtering and themes.
+- Sticky focus anchor on Today.
+- Energy and brain-state check-in that adjusts scoring.
+- Rule-based brain-dump triage.
+- Backup confidence UI.
+- Simple browser notifications for focus and due rhythms.
+- Planning docs for sync/login, voice capture, and AI boundaries.
 
-## Priority 1: Make Focus Central
+## Completed: Make Focus Central
 
 Goal:
 
 Make the active focus session hard to lose.
 
-Small version:
+Implemented:
 
 - sticky focus strip on Today when a session exists
 - current step always visible
@@ -45,13 +51,13 @@ Acceptance checks:
 - completing the step clears or advances the session correctly
 - no horizontal overflow on mobile
 
-## Priority 2: Energy Check-In
+## Completed: Energy Check-In
 
 Goal:
 
 Let the user quickly tell the app what kind of day it is, then adjust recommendation scoring.
 
-Small version:
+Implemented:
 
 - Energy: Low / Medium / High
 - Brain state: Clear / Foggy / Avoiding / Overloaded
@@ -72,13 +78,13 @@ Acceptance checks:
 - check-in is optional and quick
 - state resets or becomes stale the next day
 
-## Priority 3: Smarter Brain Dump
+## Completed: Smarter Brain Dump
 
 Goal:
 
 Reduce typing and organizing friction when the user has messy thoughts.
 
-Small version:
+Implemented:
 
 - paste a messy brain dump
 - split likely tasks by line or sentence
@@ -97,13 +103,13 @@ Acceptance checks:
 - extracted tasks can be edited before save
 - mobile layout remains simple
 
-## Priority 4: Backup Confidence
+## Completed: Backup Confidence
 
 Goal:
 
 Make local-only storage less scary before adding sync.
 
-Small version:
+Implemented:
 
 - show last backup date
 - warn when no recent export exists
@@ -122,9 +128,15 @@ Acceptance checks:
 - export updates last-backup state
 - import confidence copy is clear
 
-## Later: Sync, Login, Voice, AI
+## Planned: Sync, Login, Voice, AI
 
 These are important, but they need planning before implementation.
+
+Planning docs:
+
+- `docs/planning/SYNC_LOGIN_PLAN.md`
+- `docs/planning/VOICE_CAPTURE_PLAN.md`
+- `docs/planning/AI_BOUNDARY_PLAN.md`
 
 Sync/login needs decisions about:
 
@@ -149,4 +161,3 @@ AI needs decisions about:
 - user confirmation before creating tasks
 - cost and rate limits
 - failure modes
-

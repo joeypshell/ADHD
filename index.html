@@ -35,6 +35,37 @@
             </div>
           </section>
 
+          <section class="focus-anchor" id="focusAnchor" hidden aria-live="polite"></section>
+
+          <section class="checkin-shell" aria-labelledby="checkinTitle">
+            <div class="checkin-heading">
+              <div>
+                <p class="eyebrow">Today check-in</p>
+                <h2 id="checkinTitle">Set the difficulty level</h2>
+              </div>
+              <button class="ghost-button small-button" id="clearCheckinButton" type="button">Clear</button>
+            </div>
+            <div class="checkin-grid">
+              <div>
+                <p class="choice-label">Energy</p>
+                <div class="segmented-row" id="energyButtons" role="group" aria-label="Energy today">
+                  <button type="button" data-energy="low">Low</button>
+                  <button type="button" data-energy="medium">Medium</button>
+                  <button type="button" data-energy="high">High</button>
+                </div>
+              </div>
+              <div>
+                <p class="choice-label">Brain state</p>
+                <div class="segmented-row" id="brainButtons" role="group" aria-label="Brain state">
+                  <button type="button" data-brain="clear">Clear</button>
+                  <button type="button" data-brain="foggy">Foggy</button>
+                  <button type="button" data-brain="avoiding">Avoiding</button>
+                  <button type="button" data-brain="overloaded">Overloaded</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="recommendation-shell" aria-labelledby="nowTitle">
             <div id="recommendationPanel"></div>
           </section>
@@ -88,6 +119,10 @@
               <strong>Quick capture</strong>
               <span>Get a loose thing out of your head.</span>
             </button>
+            <button class="add-choice" type="button" data-add-mode="brain">
+              <strong>Brain dump</strong>
+              <span>Paste a messy list and sort it.</span>
+            </button>
             <button class="add-choice" type="button" data-add-mode="template">
               <strong>Template</strong>
               <span>Start from a common life rail.</span>
@@ -105,6 +140,18 @@
               <input id="addCaptureInput" autocomplete="off" placeholder="Example: renew car sticker">
               <button type="submit">Add</button>
             </form>
+          </section>
+          <section class="brain-dump-panel add-panel" id="brainDumpPanel" data-add-panel="brain">
+            <p class="eyebrow">Messy capture</p>
+            <h3>Paste it messy. Save only what you want.</h3>
+            <label class="sr-only" for="brainDumpInput">Brain dump</label>
+            <textarea id="brainDumpInput" rows="6" placeholder="Example: renew sticker, ask clinic about tests, maybe clean kitchen tonight"></textarea>
+            <div class="brain-dump-actions">
+              <button class="primary-button" id="extractBrainDumpButton" type="button">Find tasks</button>
+              <button class="secondary-button" id="clearBrainDumpButton" type="button">Clear</button>
+            </div>
+            <div class="brain-candidate-list" id="brainCandidateList"></div>
+            <button class="primary-button" id="saveBrainDumpButton" type="button" hidden>Save selected</button>
           </section>
           <section class="template-shelf add-panel" aria-labelledby="templatesTitle" data-add-panel="template">
             <div class="section-heading small">
@@ -263,12 +310,15 @@
           </div>
           <button class="icon-button" type="button" id="closeBackupButton" aria-label="Close">x</button>
         </div>
+        <div class="backup-status" id="backupStatus"></div>
         <p class="dialog-copy">This version saves on this browser. Export a backup before switching phones, clearing browser data, or experimenting heavily.</p>
         <div class="backup-actions">
           <button class="primary-button" id="exportButton" type="button">Export backup</button>
           <button class="secondary-button" id="importButton" type="button">Import backup</button>
+          <button class="secondary-button" id="rhythmAlertButton" type="button">Enable due alerts</button>
           <input id="importFile" type="file" accept="application/json" hidden>
         </div>
+        <p class="dialog-copy small-copy" id="alertStatus">Alerts are optional and depend on this browser allowing notifications.</p>
       </section>
     </dialog>
 
