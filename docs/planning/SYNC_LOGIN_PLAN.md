@@ -67,17 +67,27 @@ Cons:
 
 Good fit only if this remains a personal tool.
 
-## Recommended First Sync MVP
+## Chosen First Sync MVP
 
-Use Supabase or Firebase, but keep the data payload close to the current normalized JSON shape.
+Use Supabase first. Keep the runtime app static on GitHub Pages, keep `localStorage` as the offline cache, and store one user-scoped JSON state document in Supabase for the first version.
 
-MVP:
+Why one JSON document first:
+
+- It matches the current normalized state shape.
+- It avoids premature per-item conflict complexity.
+- It is easier to migrate safely from existing browser data.
+- It gives cross-device backup and restore quickly.
+- It can later be split into per-item records without changing the user-facing model.
+
+MVP behavior:
 
 - login screen only when sync is enabled
-- localStorage remains the offline cache
-- cloud stores one encrypted or user-scoped state document
-- manual "sync now" first, then auto-sync later
+- localStorage remains the offline cache and source for offline use
+- Supabase stores one user-scoped state document
+- manual "Sync now" first
+- auto-sync only after manual sync proves trustworthy
 - import/export remains available
+- no private API keys in GitHub Pages
 
 ## Data Migration
 
@@ -89,13 +99,101 @@ MVP:
    - export backup first
 4. Never overwrite local data without confirmation.
 
+First-login screen copy should make the choices concrete:
+
+- "Upload this browser" means local data becomes the cloud copy.
+- "Use cloud copy" means this browser is replaced by the existing cloud copy.
+- "Stay local" means login is cancelled and nothing changes.
+- "Export backup first" downloads JSON before either destructive path.
+
+## Supabase Data Shape
+
+Initial table: `user_state`
+
+Columns:
+
+- `user_id uuid primary key references auth.users(id) on delete cascade`
+- `state_json jsonb not null`
+- `state_version integer not null`
+- `client_updated_at timestamptz not null`
+- `server_updated_at timestamptz not null default now()`
+- `last_sync_client_id text`
+
+Initial `state_json` is the current normalized app state:
+
+- `version`
+- `createdAt`
+- `lastReviewed`
+- `lastBackupAt`
+- `mode`
+- `filter`
+- `todayPlan`
+- `focusSession`
+- `dailyCheckin`
+- `alerts`
+- `items`
+- `recurring`
+
+Row-level security:
+
+- users can select only their own `user_id`
+- users can insert only their own `user_id`
+- users can update only their own `user_id`
+- users can delete only their own `user_id`
+
+## Static Config Boundary
+
+Allowed in GitHub Pages:
+
+- Supabase project URL
+- Supabase public anon key
+- feature flag for sync enabled/disabled
+
+Never store in GitHub Pages:
+
+- Supabase service role key
+- OpenAI/API provider keys
+- private JWT secrets
+- database admin credentials
+
+If AI or server-side migration is added later, use a backend or Supabase Edge Function with server-side secrets. The static app should never call paid model APIs directly with a secret embedded in JavaScript.
+
+## First Runtime Screens
+
+Settings:
+
+- "Sync: Off / Signed in / Needs attention"
+- Login button
+- Logout button
+- Sync now button
+- Last synced timestamp
+- Local-only warning when signed out
+
+First login migration:
+
+- show local item count and cloud item count
+- offer Upload this browser, Use cloud copy, Stay local, Export backup first
+- require confirmation before replacing local data
+
+Manual sync:
+
+1. Normalize current local state.
+2. Fetch cloud state for current user.
+3. If no cloud state exists, upload local state.
+4. If cloud exists and local has no newer changes, download cloud.
+5. If both changed since last sync, show conflict choice.
+6. Save successful result to localStorage.
+7. Update last-sync metadata.
+
 ## Conflict Handling
 
 Smallest useful version:
 
-- store `updatedAt` at the state level and item level
-- if cloud and local both changed, show a conflict screen
-- prefer item-level latest update only after user confirmation
+- store `lastSyncedAt` and `lastSyncedServerUpdatedAt` locally
+- compare local `state.lastSaved` or equivalent to last synced time
+- compare cloud `server_updated_at` to last synced server time
+- if both changed, show a conflict screen
+- first conflict options are "Keep this browser" or "Use cloud copy"
 
 Later:
 
@@ -128,7 +226,20 @@ Each failure must leave local data usable.
 Before writing sync code:
 
 - improve backup confidence UI
-- define provider
-- define schema
-- define migration copy and screens
+- create Supabase project
+- add `user_state` table and RLS policies
+- add public config file or constants for project URL and anon key
+- add login/logout UI inside settings
+- add first-login migration screen
+- add manual Sync now
+- add sync status and failure feedback
 
+## Implementation Checklist Issues
+
+1. Add Supabase client script/config and disabled-by-default sync flag.
+2. Add auth UI in settings.
+3. Add `user_state` schema SQL and RLS docs.
+4. Add first-login migration dialog.
+5. Add manual Sync now with one-document upload/download.
+6. Add conflict screen for cloud/local divergence.
+7. Add sync status tests and browser QA.

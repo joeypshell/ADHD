@@ -51,13 +51,13 @@ Cons:
 
 ## Recommended First Version
 
-Use browser speech recognition only as an optional enhancement.
+Use browser speech recognition only as an optional enhancement. The first static-browser prototype is implemented for Today quick capture and Add quick capture.
 
 Flow:
 
 1. User taps a microphone button in Add or Today quick capture.
 2. Browser asks for microphone permission.
-3. Transcript appears in an editable text area.
+3. Transcript appears in the editable capture input.
 4. User edits transcript.
 5. User sends it to Quick Capture or Brain Dump triage.
 
@@ -83,4 +83,3 @@ The UI must explain:
 - No item created without confirmation.
 - Transcript can be edited or discarded.
 - Unsupported browsers do not break Add or Today.
-

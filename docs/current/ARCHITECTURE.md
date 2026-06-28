@@ -120,18 +120,18 @@ Missed time-window items stay visible instead of disappearing.
 Today:
 
 - mode switch
-- energy/brain-state check-in
+- compact optional energy/brain-state check-in
 - sticky focus anchor when a Doing timer is active
 - recommendation card
-- visual timeline: Now / Next / Later / Missed
+- compact visual timeline: Now / Next / Later / Missed / Done
 - complete Today list with direct Doing, Done, and same-day Undo actions
-- quick capture with a tiny-start follow-up
+- quick capture with browser voice fill-in and a tiny-start follow-up
 
 Doing and timers are intentionally separate. `status: "now"` means the item is being worked on or should stay at the top; a `focusSession` exists only when the user explicitly starts the timer. Today and item detail use explicit snooze destinations: 15 minutes, 1 hour, tonight, or tomorrow.
 
 Add:
 
-- quick capture with generated tiny starts and an optional clarification follow-up
+- quick capture with generated tiny starts, browser voice fill-in, and an optional clarification follow-up
 - rule-based brain-dump triage
 - templates
 - first-run life rail starter for Body, House, and Work anchors
@@ -183,6 +183,10 @@ Notification permission is user-initiated. The app can:
 
 Notifications are not native push, widgets, live activities, or watch support.
 
+## Voice Capture
+
+Quick capture can use the browser Web Speech API when available. The transcript is inserted into the capture input for review and is not saved automatically. Unsupported browsers keep the normal typing flow.
+
 ## Brain Dump Triage
 
 The Add view includes a rule-based brain dump flow:
@@ -223,7 +227,7 @@ This is acceptable for now, but large features should avoid making `renderRecomm
 - No cross-device sync.
 - No login.
 - No cloud storage.
-- No voice-to-text capture.
+- No cloud speech service or AI voice parsing.
 - No AI-backed task extraction or prioritization.
 - No native or cross-device reminder system.
 - No full calendar integration.

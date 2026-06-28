@@ -37,7 +37,14 @@
 
           <section class="focus-anchor" id="focusAnchor" hidden aria-live="polite"></section>
 
-          <section class="checkin-shell" aria-labelledby="checkinTitle">
+          <details class="checkin-shell" aria-labelledby="checkinTitle">
+            <summary class="checkin-summary">
+              <span>
+                <span class="eyebrow">Difficulty</span>
+                <strong id="checkinSummaryText">No check-in</strong>
+              </span>
+              <span class="checkin-summary-action">Adjust</span>
+            </summary>
             <div class="checkin-heading">
               <div>
                 <p class="eyebrow">Today check-in</p>
@@ -65,20 +72,10 @@
               </div>
             </div>
             <div class="checkin-effect" id="checkinEffect" aria-live="polite"></div>
-          </section>
+          </details>
 
           <section class="recommendation-shell" aria-labelledby="nowTitle">
             <div id="recommendationPanel"></div>
-          </section>
-
-          <section class="today-timeline-shell" aria-labelledby="todayTimelineTitle">
-            <div class="section-heading compact">
-              <div>
-                <p class="eyebrow">Day shape</p>
-                <h2 id="todayTimelineTitle">Timeline</h2>
-              </div>
-            </div>
-            <div class="today-timeline" id="todayTimeline"></div>
           </section>
 
           <section class="today-queue-shell" aria-labelledby="todayQueueTitle">
@@ -95,11 +92,23 @@
             <div class="today-queue-list" id="todayQueueList"></div>
           </section>
 
+          <section class="today-timeline-shell" aria-labelledby="todayTimelineTitle">
+            <div class="section-heading compact">
+              <div>
+                <p class="eyebrow">Day shape</p>
+                <h2 id="todayTimelineTitle">Timeline</h2>
+              </div>
+            </div>
+            <div class="today-timeline" id="todayTimeline"></div>
+          </section>
+
           <form class="quick-capture" id="quickCaptureForm">
             <label class="sr-only" for="quickCaptureInput">Capture a loose thing</label>
             <input id="quickCaptureInput" autocomplete="off" placeholder="Capture a loose thing">
+            <button class="voice-button" type="button" data-voice-target="quick" aria-label="Dictate quick capture">Mic</button>
             <button type="submit">Add</button>
           </form>
+          <p class="voice-status" id="quickVoiceStatus" aria-live="polite"></p>
           <section class="capture-followup" id="quickCaptureFollowup" hidden aria-live="polite"></section>
         </section>
 
@@ -141,8 +150,10 @@
             <form class="quick-capture add-capture" id="addCaptureForm">
               <label class="sr-only" for="addCaptureInput">Capture a loose thing</label>
               <input id="addCaptureInput" autocomplete="off" placeholder="Example: renew car sticker">
+              <button class="voice-button" type="button" data-voice-target="add" aria-label="Dictate add capture">Mic</button>
               <button type="submit">Add</button>
             </form>
+            <p class="voice-status" id="addVoiceStatus" aria-live="polite"></p>
             <section class="capture-followup" id="addCaptureFollowup" hidden aria-live="polite"></section>
           </section>
           <section class="brain-dump-panel add-panel" id="brainDumpPanel" data-add-panel="brain">
@@ -315,13 +326,17 @@
           <button class="icon-button" type="button" id="closeBackupButton" aria-label="Close">x</button>
         </div>
         <div class="backup-status" id="backupStatus"></div>
-        <p class="dialog-copy">This version saves on this browser. Export a backup before switching phones, clearing browser data, or experimenting heavily.</p>
+        <div class="backup-local-note">
+          <strong>Saved only on this browser</strong>
+          <span>Until sync exists, this phone/browser owns its own copy. Export before switching devices, clearing browser data, or experimenting heavily.</span>
+        </div>
         <div class="backup-actions">
           <button class="primary-button" id="exportButton" type="button">Export backup</button>
           <button class="secondary-button" id="importButton" type="button">Import backup</button>
           <button class="secondary-button" id="rhythmAlertButton" type="button">Enable due alerts</button>
           <input id="importFile" type="file" accept="application/json" hidden>
         </div>
+        <p class="backup-feedback" id="backupFeedback" aria-live="polite"></p>
         <p class="dialog-copy small-copy" id="alertStatus">Alerts are optional and depend on this browser allowing notifications.</p>
       </section>
     </dialog>

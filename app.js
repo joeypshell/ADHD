@@ -291,6 +291,7 @@ let addMode = "capture";
 let focusTimerId = 0;
 let brainDumpCandidates = [];
 let captureFollowupItemId = "";
+let voiceRecognition = null;
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -299,6 +300,7 @@ const els = {
   focusAnchor: document.querySelector("#focusAnchor"),
   energyButtons: document.querySelectorAll("[data-energy]"),
   brainButtons: document.querySelectorAll("[data-brain]"),
+  checkinSummaryText: document.querySelector("#checkinSummaryText"),
   checkinEffect: document.querySelector("#checkinEffect"),
   clearCheckinButton: document.querySelector("#clearCheckinButton"),
   todayTimeline: document.querySelector("#todayTimeline"),
@@ -308,11 +310,13 @@ const els = {
   quickCaptureForm: document.querySelector("#quickCaptureForm"),
   quickCaptureInput: document.querySelector("#quickCaptureInput"),
   quickCaptureFollowup: document.querySelector("#quickCaptureFollowup"),
+  quickVoiceStatus: document.querySelector("#quickVoiceStatus"),
   addChoiceButtons: document.querySelectorAll("[data-add-mode]"),
   addPanels: document.querySelectorAll("[data-add-panel]"),
   addCaptureForm: document.querySelector("#addCaptureForm"),
   addCaptureInput: document.querySelector("#addCaptureInput"),
   addCaptureFollowup: document.querySelector("#addCaptureFollowup"),
+  addVoiceStatus: document.querySelector("#addVoiceStatus"),
   brainDumpInput: document.querySelector("#brainDumpInput"),
   extractBrainDumpButton: document.querySelector("#extractBrainDumpButton"),
   clearBrainDumpButton: document.querySelector("#clearBrainDumpButton"),
@@ -324,6 +328,7 @@ const els = {
   backupToolsButton: document.querySelector("#backupToolsButton"),
   backupDialog: document.querySelector("#backupDialog"),
   backupStatus: document.querySelector("#backupStatus"),
+  backupFeedback: document.querySelector("#backupFeedback"),
   rhythmAlertButton: document.querySelector("#rhythmAlertButton"),
   alertStatus: document.querySelector("#alertStatus"),
   closeBackupButton: document.querySelector("#closeBackupButton"),
@@ -2034,6 +2039,15 @@ function checkinEffectMessages(checkin = normalizeDailyCheckin(state.dailyChecki
   return messages;
 }
 
+function checkinSummaryText(checkin = normalizeDailyCheckin(state.dailyCheckin)) {
+  const parts = [];
+  const energyLabels = { low: "Low energy", medium: "Normal energy", high: "High energy" };
+  const brainLabels = { clear: "Ready", foggy: "Foggy", avoiding: "Avoiding", overloaded: "Overloaded" };
+  if (energyLabels[checkin.energy]) parts.push(energyLabels[checkin.energy]);
+  if (brainLabels[checkin.brain]) parts.push(brainLabels[checkin.brain]);
+  return parts.length ? parts.join(" / ") : "No check-in";
+}
+
 function checkinReasonsForItem(item) {
   const checkin = normalizeDailyCheckin(state.dailyCheckin);
   const reasons = [];
@@ -2412,11 +2426,11 @@ function renderTodayTimeline(entries, topItemId = "") {
     const list = document.createElement("div");
     list.className = "timeline-items";
     if (buckets[group.id].length) {
-      buckets[group.id].slice(0, 3).forEach((entry) => list.append(makeTimelineItem(entry)));
-      if (buckets[group.id].length > 3) {
+      buckets[group.id].slice(0, 1).forEach((entry) => list.append(makeTimelineItem(entry)));
+      if (buckets[group.id].length > 1) {
         const more = document.createElement("p");
         more.className = "timeline-more";
-        more.textContent = `+${buckets[group.id].length - 3} more`;
+        more.textContent = `+${buckets[group.id].length - 1} more`;
         list.append(more);
       }
     } else {
@@ -2646,6 +2660,7 @@ function createFromTemplate(template, options = {}) {
 
 function renderCheckin() {
   const checkin = normalizeDailyCheckin(state.dailyCheckin);
+  if (els.checkinSummaryText) els.checkinSummaryText.textContent = checkinSummaryText(checkin);
   els.energyButtons.forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.energy === checkin.energy);
     button.setAttribute("aria-pressed", button.dataset.energy === checkin.energy ? "true" : "false");
@@ -3461,6 +3476,69 @@ function dismissCaptureFollowup() {
   renderCaptureFollowups();
 }
 
+function voiceSupport() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function voiceTarget(target) {
+  if (target === "add") return { input: els.addCaptureInput, status: els.addVoiceStatus };
+  return { input: els.quickCaptureInput, status: els.quickVoiceStatus };
+}
+
+function setVoiceStatus(target, message) {
+  const { status } = voiceTarget(target);
+  if (status) status.textContent = message || "";
+}
+
+function startVoiceCapture(target = "quick") {
+  const Recognition = voiceSupport();
+  const { input } = voiceTarget(target);
+  if (!input) return;
+  if (!Recognition) {
+    setVoiceStatus(target, "Voice capture is not supported in this browser.");
+    return;
+  }
+
+  if (voiceRecognition) {
+    voiceRecognition.stop();
+    voiceRecognition = null;
+  }
+
+  const recognition = new Recognition();
+  voiceRecognition = recognition;
+  recognition.lang = navigator.language || "en-US";
+  recognition.interimResults = false;
+  recognition.continuous = false;
+  setVoiceStatus(target, "Listening. Review the words before tapping Add.");
+
+  recognition.addEventListener("result", (event) => {
+    const transcript = Array.from(event.results)
+      .map((result) => result[0]?.transcript || "")
+      .join(" ")
+      .trim();
+    if (!transcript) return;
+    input.value = [input.value.trim(), transcript].filter(Boolean).join(" ");
+    input.focus();
+    setVoiceStatus(target, "Dictation added. Review it, then tap Add.");
+  });
+
+  recognition.addEventListener("error", (event) => {
+    const reason = event.error === "not-allowed" ? "Microphone permission was blocked." : "Voice capture stopped before it heard anything.";
+    setVoiceStatus(target, reason);
+  });
+
+  recognition.addEventListener("end", () => {
+    if (voiceRecognition === recognition) voiceRecognition = null;
+  });
+
+  try {
+    recognition.start();
+  } catch {
+    setVoiceStatus(target, "Voice capture could not start in this browser.");
+    voiceRecognition = null;
+  }
+}
+
 function quickCapture(event) {
   event.preventDefault();
   const title = els.quickCaptureInput.value.trim();
@@ -4124,7 +4202,7 @@ function renderBackupStatus() {
     const date = toDate(state.lastBackupAt);
     const stale = !date || Date.now() - date.getTime() > 7 * 86400000;
     els.backupStatus.className = `backup-status${stale ? " needs-backup" : ""}`;
-    els.backupStatus.textContent = `${backupAgeText()} ${stale ? "Export before switching devices or clearing browser data." : "You have a recent local export marker."}`;
+    els.backupStatus.textContent = `${backupAgeText()} ${stale ? "This browser has no recent backup." : "Recent backup marker is saved locally."}`;
   }
 
   const canNotify = "Notification" in window;
@@ -4144,6 +4222,12 @@ function renderBackupStatus() {
   }
 }
 
+function setBackupFeedback(message, tone = "ok") {
+  if (!els.backupFeedback) return;
+  els.backupFeedback.textContent = message;
+  els.backupFeedback.className = `backup-feedback ${tone}`;
+}
+
 function exportData() {
   state.lastBackupAt = new Date().toISOString();
   saveState();
@@ -4156,6 +4240,7 @@ function exportData() {
   link.click();
   URL.revokeObjectURL(url);
   renderBackupStatus();
+  setBackupFeedback("Backup exported. Keep that file somewhere you can find if this browser is lost.", "ok");
 }
 
 function importData(file) {
@@ -4163,12 +4248,14 @@ function importData(file) {
   reader.addEventListener("load", () => {
     try {
       const next = normalizeData(JSON.parse(String(reader.result)));
-      if (!confirm("Replace this browser's command center with the imported backup?")) return;
+      if (!confirm("Replace this browser's local command center with the imported backup? Export first if you are unsure.")) return;
       state = next;
       saveState();
       render();
       renderBackupStatus();
+      setBackupFeedback("Backup imported into this browser.", "ok");
     } catch {
+      setBackupFeedback("Import failed. That file was not a valid command center backup.", "warn");
       alert("That file was not a valid command center backup.");
     }
   });
@@ -4242,6 +4329,9 @@ function bindEvents() {
 
   els.quickCaptureForm.addEventListener("submit", quickCapture);
   els.addCaptureForm.addEventListener("submit", addCapture);
+  document.querySelectorAll("[data-voice-target]").forEach((button) => {
+    button.addEventListener("click", () => startVoiceCapture(button.dataset.voiceTarget));
+  });
   els.extractBrainDumpButton.addEventListener("click", extractBrainDump);
   els.clearBrainDumpButton.addEventListener("click", () => {
     brainDumpCandidates = [];
