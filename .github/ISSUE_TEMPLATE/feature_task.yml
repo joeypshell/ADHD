@@ -1,0 +1,65 @@
+name: Feature or task
+description: Plan a focused product or engineering change
+title: "[Feature]: "
+labels: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user pain does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: desired
+    attributes:
+      label: Desired behavior
+      description: What should be true when this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included?
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: What should not be done in this issue?
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance checks
+      description: What should be tested or verified?
+      placeholder: |
+        - 
+    validations:
+      required: true
+  - type: dropdown
+    id: test_tier
+    attributes:
+      label: Required test tier
+      options:
+        - quick
+        - docs
+        - visual
+        - mobile-like
+        - full
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      options:
+        - low
+        - medium
+        - high
+    validations:
+      required: true
+

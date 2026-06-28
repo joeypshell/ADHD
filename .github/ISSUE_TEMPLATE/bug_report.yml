@@ -1,0 +1,56 @@
+name: Bug report
+description: Report broken behavior or a regression
+title: "[Bug]: "
+labels: []
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device/browser
+      placeholder: "Example: iPhone Safari, desktop Chrome"
+    validations:
+      required: false
+  - type: textarea
+    id: data_risk
+    attributes:
+      label: Data risk
+      description: Did this affect saved tasks, backups, or localStorage data?
+    validations:
+      required: false
+  - type: dropdown
+    id: test_tier
+    attributes:
+      label: Suggested test tier
+      options:
+        - quick
+        - docs
+        - visual
+        - mobile-like
+        - full
+    validations:
+      required: true
+

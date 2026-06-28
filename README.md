@@ -21,6 +21,22 @@ The Add tab starts with three paths: Quick capture, Templates, and Wizard. The W
 
 Each path asks small questions, allows "I don't know," and creates a structured item with a tiny start. Rhythm setup includes cadence, trigger, and minimum version.
 
+## Agent Workflow
+
+Development guidance lives in [`AGENTS.md`](AGENTS.md). Current facts live in `docs/current/`; future plans live in `docs/planning/`.
+
+Run the local checks with:
+
+```powershell
+.\scripts\test.ps1 -Tier quick
+```
+
+For documentation/workflow changes:
+
+```powershell
+.\scripts\test.ps1 -Tier docs
+```
+
 ## Run Locally
 
 From this folder:
