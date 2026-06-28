@@ -59,6 +59,8 @@ Open `http://localhost:8080`.
 
 The app stores data in the browser with `localStorage`. Use the `...` backup menu to export or import a JSON backup.
 
-GitHub Pages is static, so it cannot save changes back to GitHub by itself. The current app includes a disabled-by-default Supabase sync scaffold in `sync-config.js` plus a Settings sync panel, but cross-device login and cloud writes are not active yet.
+GitHub Pages is static, so it cannot save changes back to GitHub by itself. The app includes disabled-by-default Supabase sync in `sync-config.js`. When configured, Settings can send an email magic link and run manual Sync now against one user-scoped `user_state` JSON document.
 
 To prepare Supabase sync, create a Supabase project, run the SQL and RLS setup in `docs/planning/SUPABASE_SETUP.md`, and add only the public project URL and public anon key to `sync-config.js`. Never add the service role key, database password, API provider keys, or other private secrets to this static app.
+
+Sync is explicit: the first Sync now asks whether to upload this browser, use the cloud copy, export a backup first, or stay local. Supabase storage is not end-to-end encrypted by this app, so treat synced tasks as sensitive cloud data.

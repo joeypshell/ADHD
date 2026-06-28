@@ -30,7 +30,17 @@ Legacy key:
 
 Because GitHub Pages is static, the app cannot sync data back to GitHub by itself. Import/export is the current backup path.
 
-`sync-config.js` defines `window.LCC_SYNC_CONFIG`. It is disabled by default and may contain only browser-safe public values, such as a Supabase project URL and public anon key. The Settings sync panel reads this config and shows guardrails, but there is no active login, remote read, or remote write yet.
+`sync-config.js` defines `window.LCC_SYNC_CONFIG`. It is disabled by default and may contain only browser-safe public values, such as a Supabase project URL, public anon key, and Supabase JS CDN URL.
+
+When sync is configured, the Settings sync panel can:
+
+- load the Supabase browser client on demand
+- send an email magic-link login
+- restore a Supabase Auth session
+- sign out without deleting local task data
+- manually upload or download one user-scoped `user_state` JSON document
+
+Sync is manual. There is no background auto-sync, no per-item merge, and no app-level end-to-end encryption. Supabase row-level security is expected to protect each user's row.
 
 ## Data Model
 
@@ -159,8 +169,10 @@ Settings / Backup:
 
 - local export/import
 - rhythm alert permission controls
-- disabled-by-default sync status scaffold
-- guarded login/logout/sync buttons until Supabase auth and cloud storage are implemented
+- disabled-by-default Supabase sync controls
+- email magic-link login/logout when configured
+- first-sync choice dialog
+- manual Sync now upload/download
 
 ## Focus Session
 
@@ -235,10 +247,9 @@ This is acceptable for now, but large features should avoid making `renderRecomm
 
 ## Current Limitations
 
-- No cross-device sync.
-- No login.
-- No cloud storage.
-- Sync is UI/config/schema scaffold only.
+- No automatic cross-device sync.
+- No per-item cloud merge.
+- No app-level end-to-end encryption for Supabase data.
 - No cloud speech service or AI voice parsing.
 - No AI-backed task extraction or prioritization.
 - No native or cross-device reminder system.

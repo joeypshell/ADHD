@@ -212,6 +212,13 @@ The app may contain medical, work, finance, and personal data. Sync must documen
 - who can access it
 - how to export and delete it
 
+Current implementation:
+
+- Supabase stores one `state_json` document per signed-in user.
+- The app does not add end-to-end encryption before sending data to Supabase.
+- Row-level security is required so each user can access only their own row.
+- Export/import remains the local backup and recovery path.
+
 ## Failure Modes
 
 - offline use
@@ -238,18 +245,22 @@ Before writing sync code:
 
 ## Implementation Checklist Issues
 
-Completed scaffold:
+Completed:
 
 - Add public `sync-config.js` with sync disabled by default.
-- Add Settings sync status panel with guarded Login, Logout, and Sync now buttons.
-- Add `state.sync` metadata for client id, login display, and future sync timestamps.
+- Add Settings sync status panel with Login, Logout, and Sync now controls.
+- Add `state.sync` metadata for client id, login display, session checks, and sync timestamps.
 - Add `user_state` schema SQL and RLS docs.
+- Add Supabase browser client loader.
+- Wire email magic-link login/logout to Supabase Auth.
+- Add first-login migration dialog.
+- Add manual Sync now with one-document upload/download.
+- Add simple conflict choice for cloud/local divergence.
 
 Remaining implementation:
 
-1. Add Supabase browser client.
-2. Wire login/logout to Supabase Auth.
-3. Add first-login migration dialog.
-4. Add manual Sync now with one-document upload/download.
-5. Add conflict screen for cloud/local divergence.
-6. Add sync status tests and browser QA.
+1. Test against a real Supabase project.
+2. Add stronger visible conflict details before choosing a winner.
+3. Add a signed-in "last cloud change" status line.
+4. Add optional auto-sync after manual sync proves trustworthy.
+5. Add a deletion/export account data path.

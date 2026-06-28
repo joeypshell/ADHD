@@ -13,6 +13,7 @@ window.LCC_SYNC_CONFIG = {
   enabled: true,
   supabaseUrl: "https://YOUR_PROJECT.supabase.co",
   supabaseAnonKey: "YOUR_PUBLIC_ANON_KEY",
+  supabaseJsUrl: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
   provider: "supabase"
 };
 ```
@@ -116,5 +117,6 @@ The first version stores one JSON document per user:
 - `state_json` stores the normalized app state
 - manual Sync Now runs before any auto-sync
 - conflict handling starts with Keep this browser vs Use cloud copy
+- the app does not add end-to-end encryption before storing `state_json` in Supabase
 
 This intentionally avoids per-item merge complexity until the one-document sync loop is trustworthy.

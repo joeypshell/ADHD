@@ -340,8 +340,12 @@
           </div>
           <div class="sync-status" id="syncStatus"></div>
           <p class="dialog-copy small-copy" id="syncCopy">Sync is disabled until Supabase public config is added.</p>
+          <label class="sync-email-row" for="syncEmail">
+            Email for login link
+            <input id="syncEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com">
+          </label>
           <div class="sync-actions">
-            <button class="secondary-button" id="syncLoginButton" type="button">Log in</button>
+            <button class="secondary-button" id="syncLoginButton" type="button">Send login link</button>
             <button class="secondary-button" id="syncNowButton" type="button">Sync now</button>
             <button class="ghost-button" id="syncLogoutButton" type="button">Log out</button>
           </div>
@@ -355,6 +359,26 @@
         </div>
         <p class="backup-feedback" id="backupFeedback" aria-live="polite"></p>
         <p class="dialog-copy small-copy" id="alertStatus">Alerts are optional and depend on this browser allowing notifications.</p>
+      </section>
+    </dialog>
+
+    <dialog id="syncChoiceDialog">
+      <section class="dialog-card sync-choice-card" aria-labelledby="syncChoiceTitle">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow" id="syncChoiceMeta">First sync</p>
+            <h2 id="syncChoiceTitle">Choose what becomes the cloud copy</h2>
+          </div>
+          <button class="icon-button" type="button" id="closeSyncChoiceButton" aria-label="Close">x</button>
+        </div>
+        <div class="sync-choice-summary" id="syncChoiceSummary"></div>
+        <p class="dialog-copy small-copy" id="syncChoiceCopy"></p>
+        <div class="sync-choice-actions">
+          <button class="primary-button" id="syncUploadButton" type="button">Upload this browser</button>
+          <button class="secondary-button" id="syncDownloadButton" type="button">Use cloud copy</button>
+          <button class="secondary-button" id="syncExportFirstButton" type="button">Export backup first</button>
+          <button class="ghost-button" id="syncStayLocalButton" type="button">Stay local</button>
+        </div>
       </section>
     </dialog>
 

@@ -1,5 +1,6 @@
 const STORAGE_KEY = "life-command-center-v2";
 const LEGACY_STORAGE_KEY = "life-command-center-v1";
+const SUPABASE_JS_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const AREAS = [
   "Work",
@@ -215,7 +216,7 @@ const STARTER_RHYTHM_TITLES = new Set([
 ]);
 
 const DEFAULT_DATA = {
-  version: 9,
+  version: 10,
   createdAt: new Date().toISOString(),
   lastReviewed: "",
   lastBackupAt: "",
@@ -293,6 +294,8 @@ let focusTimerId = 0;
 let brainDumpCandidates = [];
 let captureFollowupItemId = "";
 let voiceRecognition = null;
+let supabaseClientPromise = null;
+let syncChoiceContext = null;
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -334,9 +337,20 @@ const els = {
   syncStatus: document.querySelector("#syncStatus"),
   syncCopy: document.querySelector("#syncCopy"),
   syncFeedback: document.querySelector("#syncFeedback"),
+  syncEmail: document.querySelector("#syncEmail"),
   syncLoginButton: document.querySelector("#syncLoginButton"),
   syncLogoutButton: document.querySelector("#syncLogoutButton"),
   syncNowButton: document.querySelector("#syncNowButton"),
+  syncChoiceDialog: document.querySelector("#syncChoiceDialog"),
+  syncChoiceMeta: document.querySelector("#syncChoiceMeta"),
+  syncChoiceTitle: document.querySelector("#syncChoiceTitle"),
+  syncChoiceSummary: document.querySelector("#syncChoiceSummary"),
+  syncChoiceCopy: document.querySelector("#syncChoiceCopy"),
+  closeSyncChoiceButton: document.querySelector("#closeSyncChoiceButton"),
+  syncUploadButton: document.querySelector("#syncUploadButton"),
+  syncDownloadButton: document.querySelector("#syncDownloadButton"),
+  syncExportFirstButton: document.querySelector("#syncExportFirstButton"),
+  syncStayLocalButton: document.querySelector("#syncStayLocalButton"),
   rhythmAlertButton: document.querySelector("#rhythmAlertButton"),
   alertStatus: document.querySelector("#alertStatus"),
   closeBackupButton: document.querySelector("#closeBackupButton"),
@@ -493,8 +507,11 @@ function createSyncState() {
     enabled: false,
     lastSyncedAt: "",
     lastSyncedServerUpdatedAt: "",
+    lastSessionCheckedAt: "",
+    userId: "",
     userEmail: "",
-    status: "off"
+    status: "off",
+    lastError: ""
   };
 }
 
@@ -507,8 +524,11 @@ function normalizeSyncState(sync = {}) {
     enabled: Boolean(sync.enabled),
     lastSyncedAt: sync.lastSyncedAt || "",
     lastSyncedServerUpdatedAt: sync.lastSyncedServerUpdatedAt || "",
+    lastSessionCheckedAt: sync.lastSessionCheckedAt || "",
+    userId: sync.userId || "",
     userEmail: sync.userEmail || "",
-    status: sync.status || "off"
+    status: sync.status || "off",
+    lastError: sync.lastError || ""
   };
 }
 
@@ -778,7 +798,7 @@ function normalizeData(data) {
   const normalized = {
     ...cloneData(DEFAULT_DATA),
     ...data,
-    version: 9,
+    version: 10,
     lastBackupAt: data.lastBackupAt || "",
     mode: DASHBOARD_MODES.some((mode) => mode.id === data.mode) ? data.mode : "home",
     filter: { area: "all", status: "", kind: "", ...(data.filter || {}) },
@@ -984,8 +1004,9 @@ function clampNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, number));
 }
 
-function saveState() {
-  state.lastSaved = new Date().toISOString();
+function saveState(options = {}) {
+  if (options.lastSaved) state.lastSaved = options.lastSaved;
+  else if (!options.keepLastSaved) state.lastSaved = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -4269,7 +4290,8 @@ function publicSyncConfig() {
     enabled: config.enabled === true,
     provider: config.provider || "supabase",
     supabaseUrl: String(config.supabaseUrl || "").trim(),
-    supabaseAnonKey: String(config.supabaseAnonKey || "").trim()
+    supabaseAnonKey: String(config.supabaseAnonKey || "").trim(),
+    supabaseJsUrl: String(config.supabaseJsUrl || SUPABASE_JS_URL).trim()
   };
 }
 
@@ -4300,14 +4322,14 @@ function syncStatusInfo() {
     return {
       badge: "Signed in",
       tone: "ok",
-      status: `Signed in as ${state.sync.userEmail}. Manual sync will use one user-scoped JSON document.`,
+      status: `Signed in as ${state.sync.userEmail}. Sync stores one private Supabase JSON document.`,
       copy: state.sync.lastSyncedAt ? `Last synced ${formatDateTime(state.sync.lastSyncedAt)}.` : "No sync has run in this browser yet."
     };
   }
   return {
     badge: "Ready",
     tone: "ok",
-    status: "Supabase public config is present. Login and manual sync are ready for the next implementation pass.",
+    status: "Supabase public config is present. Send a login link, then run manual Sync now.",
     copy: "First login will ask whether to upload this browser, use the cloud copy, or stay local."
   };
 }
@@ -4323,9 +4345,20 @@ function renderSyncStatus() {
     els.syncStatus.className = `sync-status ${info.tone}`;
   }
   if (els.syncCopy) els.syncCopy.textContent = info.copy;
-  if (els.syncLoginButton) els.syncLoginButton.disabled = false;
+  if (els.syncEmail) {
+    const emailRow = els.syncEmail.closest(".sync-email-row");
+    if (emailRow) emailRow.hidden = Boolean(state.sync?.userEmail);
+    els.syncEmail.disabled = !syncConfigReady();
+  }
+  if (els.syncLoginButton) {
+    els.syncLoginButton.hidden = Boolean(state.sync?.userEmail);
+    els.syncLoginButton.disabled = false;
+  }
   if (els.syncNowButton) els.syncNowButton.disabled = false;
-  if (els.syncLogoutButton) els.syncLogoutButton.disabled = false;
+  if (els.syncLogoutButton) {
+    els.syncLogoutButton.hidden = !state.sync?.userEmail;
+    els.syncLogoutButton.disabled = false;
+  }
 }
 
 function setSyncFeedback(message, tone = "ok") {
@@ -4347,29 +4380,303 @@ function requireSyncReady(actionLabel) {
   return true;
 }
 
-function syncLogin() {
-  if (!requireSyncReady("Login")) return;
-  setSyncFeedback("Login UI is scaffolded. The next sync pass will wire Supabase Auth and the first-login migration choices.", "ok");
+async function getSupabaseClient() {
+  if (!requireSyncReady("Sync")) return null;
+  if (!supabaseClientPromise) {
+    const config = publicSyncConfig();
+    supabaseClientPromise = import(config.supabaseJsUrl)
+      .then((module) => module.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+        auth: {
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          persistSession: true
+        }
+      }))
+      .catch((error) => {
+        supabaseClientPromise = null;
+        throw error;
+      });
+  }
+  return supabaseClientPromise;
 }
 
-function syncLogout() {
-  if (!state.sync?.userEmail) {
+function syncEmailValue() {
+  return String(els.syncEmail?.value || "").trim();
+}
+
+function syncDisplayEmail(user) {
+  return user?.email || user?.user_metadata?.email || "";
+}
+
+function updateSyncSession(user, status = "signed-in") {
+  const previousLastSaved = state.lastSaved || "";
+  state.sync = normalizeSyncState({
+    ...state.sync,
+    enabled: true,
+    userId: user?.id || "",
+    userEmail: syncDisplayEmail(user),
+    status,
+    lastSessionCheckedAt: new Date().toISOString(),
+    lastError: ""
+  });
+  saveState({ lastSaved: previousLastSaved });
+  renderSyncStatus();
+}
+
+function clearSyncSession(status = "ready") {
+  const previousLastSaved = state.lastSaved || "";
+  state.sync = normalizeSyncState({
+    ...state.sync,
+    userId: "",
+    userEmail: "",
+    status,
+    lastError: ""
+  });
+  saveState({ lastSaved: previousLastSaved });
+  renderSyncStatus();
+}
+
+async function currentSyncUser() {
+  const client = await getSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.auth.getUser();
+  if (error) throw error;
+  const user = data?.user || null;
+  if (user) updateSyncSession(user);
+  return user;
+}
+
+async function restoreSyncSession() {
+  if (!syncConfigReady()) return;
+  try {
+    const user = await currentSyncUser();
+    if (!user && state.sync?.userEmail) clearSyncSession("ready");
+  } catch (error) {
+    state.sync = normalizeSyncState({ ...state.sync, lastError: error.message || "Session restore failed." });
+    saveState({ keepLastSaved: true });
+    renderSyncStatus();
+  }
+}
+
+async function syncLogin() {
+  if (!requireSyncReady("Login")) return;
+  const email = syncEmailValue();
+  if (!email) {
+    setSyncFeedback("Enter your email first, then send the login link.", "warn");
+    return;
+  }
+  try {
+    const client = await getSupabaseClient();
+    if (!client) return;
+    const redirectTo = window.location.href.split("#")[0];
+    const { error } = await client.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo }
+    });
+    if (error) throw error;
+    setSyncFeedback("Login link sent. Open it on this same device/browser, then come back and press Sync now.", "ok");
+  } catch (error) {
+    setSyncFeedback(`Login failed: ${error.message || "Supabase could not send the link."}`, "warn");
+  }
+}
+
+async function syncLogout() {
+  if (!state.sync?.userEmail && !syncConfigReady()) {
     setSyncFeedback("No cloud session is active in this browser.", "warn");
     return;
   }
-  state.sync = normalizeSyncState({ ...state.sync, userEmail: "", status: "ready" });
-  saveState();
-  renderSyncStatus();
-  setSyncFeedback("Signed out locally. Task data stayed in this browser.", "ok");
+  try {
+    if (syncConfigReady()) {
+      const client = await getSupabaseClient();
+      if (client) await client.auth.signOut();
+    }
+  } catch {
+    // Local sign-out still matters even if the remote call fails.
+  }
+  clearSyncSession("ready");
+  setSyncFeedback("Signed out. Task data stayed in this browser.", "ok");
 }
 
-function syncNow() {
-  if (!requireSyncReady("Sync now")) return;
-  if (!state.sync?.userEmail) {
-    setSyncFeedback("Sync now needs login first. The first-login flow will offer Upload this browser or Use cloud copy.", "warn");
+function cloudItemCount(row) {
+  const items = row?.state_json?.items;
+  return Array.isArray(items) ? items.length : 0;
+}
+
+function openItemCount() {
+  return state.items.filter(isOpen).length;
+}
+
+function syncSummaryText(row) {
+  const cloudText = row ? `${cloudItemCount(row)} cloud items, last changed ${formatDateTime(row.server_updated_at)}.` : "No cloud copy exists yet.";
+  return `This browser has ${state.items.length} total items and ${openItemCount()} open items. ${cloudText}`;
+}
+
+function openSyncChoice(reason, row = null) {
+  syncChoiceContext = { reason, row };
+  if (els.syncChoiceMeta) els.syncChoiceMeta.textContent = reason === "conflict" ? "Sync conflict" : "First sync";
+  if (els.syncChoiceTitle) {
+    els.syncChoiceTitle.textContent = reason === "conflict"
+      ? "Choose which copy wins"
+      : "Choose what becomes the cloud copy";
+  }
+  if (els.syncChoiceSummary) els.syncChoiceSummary.textContent = syncSummaryText(row);
+  if (els.syncChoiceCopy) {
+    els.syncChoiceCopy.textContent = row
+      ? "Upload this browser replaces the cloud JSON. Use cloud copy replaces this browser after normalizing the cloud data."
+      : "There is no cloud copy yet. Upload this browser is the normal first step.";
+  }
+  if (els.syncDownloadButton) els.syncDownloadButton.disabled = !row;
+  if (els.syncChoiceDialog && !els.syncChoiceDialog.open) els.syncChoiceDialog.showModal();
+}
+
+async function fetchCloudState(userId) {
+  const client = await getSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from("user_state")
+    .select("state_json,state_version,client_updated_at,server_updated_at,last_sync_client_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+function hasLocalChangedSinceSync() {
+  if (!state.sync?.lastSyncedAt) return true;
+  const saved = toDate(state.lastSaved);
+  const synced = toDate(state.sync.lastSyncedAt);
+  if (!saved || !synced) return true;
+  return saved.getTime() > synced.getTime() + 1000;
+}
+
+function hasCloudChangedSinceSync(row) {
+  if (!row) return false;
+  if (!state.sync?.lastSyncedServerUpdatedAt) return true;
+  return row.server_updated_at !== state.sync.lastSyncedServerUpdatedAt;
+}
+
+function markSyncComplete(serverUpdatedAt, user) {
+  const syncedAt = new Date().toISOString();
+  state.sync = normalizeSyncState({
+    ...state.sync,
+    enabled: true,
+    userId: user.id,
+    userEmail: syncDisplayEmail(user),
+    lastSyncedAt: syncedAt,
+    lastSyncedServerUpdatedAt: serverUpdatedAt || "",
+    lastSessionCheckedAt: syncedAt,
+    status: "signed-in",
+    lastError: ""
+  });
+  saveState({ lastSaved: syncedAt });
+}
+
+async function uploadLocalToCloud() {
+  const user = await currentSyncUser();
+  if (!user) {
+    setSyncFeedback("Sync needs login first.", "warn");
     return;
   }
-  setSyncFeedback("Manual sync scaffold reached. Real upload/download will use the user_state JSON document.", "ok");
+  const client = await getSupabaseClient();
+  if (!client) return;
+  const localSnapshot = normalizeData(cloneData(state));
+  const clientUpdatedAt = state.lastSaved || new Date().toISOString();
+  const { data, error } = await client
+    .from("user_state")
+    .upsert({
+      user_id: user.id,
+      state_json: localSnapshot,
+      state_version: localSnapshot.version,
+      client_updated_at: clientUpdatedAt,
+      last_sync_client_id: state.sync.clientId
+    }, { onConflict: "user_id" })
+    .select("server_updated_at")
+    .single();
+  if (error) throw error;
+  markSyncComplete(data?.server_updated_at, user);
+  if (els.syncChoiceDialog?.open) els.syncChoiceDialog.close();
+  render();
+  setSyncFeedback("Uploaded this browser to Supabase.", "ok");
+}
+
+async function downloadCloudToLocal(row) {
+  const user = await currentSyncUser();
+  if (!user) {
+    setSyncFeedback("Sync needs login first.", "warn");
+    return;
+  }
+  if (!row?.state_json) {
+    setSyncFeedback("No cloud copy exists yet. Upload this browser first.", "warn");
+    return;
+  }
+  const currentClientId = state.sync?.clientId || createSyncState().clientId;
+  const cloud = normalizeData(row.state_json);
+  state = normalizeData({
+    ...cloud,
+    sync: {
+      ...cloud.sync,
+      clientId: currentClientId,
+      enabled: true,
+      userId: user.id,
+      userEmail: syncDisplayEmail(user),
+      lastSyncedAt: new Date().toISOString(),
+      lastSyncedServerUpdatedAt: row.server_updated_at || "",
+      lastSessionCheckedAt: new Date().toISOString(),
+      status: "signed-in",
+      lastError: ""
+    }
+  });
+  saveState({ lastSaved: state.sync.lastSyncedAt });
+  if (els.syncChoiceDialog?.open) els.syncChoiceDialog.close();
+  render();
+  setSyncFeedback("Downloaded the Supabase cloud copy into this browser.", "ok");
+}
+
+async function syncNow() {
+  if (!requireSyncReady("Sync now")) return;
+  try {
+    const user = await currentSyncUser();
+    if (!user) {
+      setSyncFeedback("Sync now needs login first. Send the login link, open it, then try again.", "warn");
+      return;
+    }
+    const row = await fetchCloudState(user.id);
+    if (!state.sync?.lastSyncedAt) {
+      openSyncChoice("first", row);
+      setSyncFeedback(row ? "Choose Upload this browser or Use cloud copy before the first sync." : "No cloud copy found. Upload this browser when you are ready.", "warn");
+      return;
+    }
+    const localChanged = hasLocalChangedSinceSync();
+    const cloudChanged = hasCloudChangedSinceSync(row);
+    if (localChanged && cloudChanged) {
+      openSyncChoice("conflict", row);
+      setSyncFeedback("Both this browser and the cloud changed. Choose which copy wins.", "warn");
+      return;
+    }
+    if (cloudChanged && row) {
+      await downloadCloudToLocal(row);
+      return;
+    }
+    await uploadLocalToCloud();
+  } catch (error) {
+    setSyncFeedback(`Sync failed: ${error.message || "Supabase could not complete manual sync."}`, "warn");
+  }
+}
+
+async function uploadChoice() {
+  try {
+    await uploadLocalToCloud();
+  } catch (error) {
+    setSyncFeedback(`Upload failed: ${error.message || "Supabase could not save this browser."}`, "warn");
+  }
+}
+
+async function downloadChoice() {
+  try {
+    await downloadCloudToLocal(syncChoiceContext?.row || null);
+  } catch (error) {
+    setSyncFeedback(`Download failed: ${error.message || "Supabase cloud copy could not be used."}`, "warn");
+  }
 }
 
 function exportData() {
@@ -4556,6 +4863,14 @@ function bindEvents() {
   els.syncLoginButton.addEventListener("click", syncLogin);
   els.syncLogoutButton.addEventListener("click", syncLogout);
   els.syncNowButton.addEventListener("click", syncNow);
+  els.closeSyncChoiceButton.addEventListener("click", () => els.syncChoiceDialog.close());
+  els.syncUploadButton.addEventListener("click", uploadChoice);
+  els.syncDownloadButton.addEventListener("click", downloadChoice);
+  els.syncExportFirstButton.addEventListener("click", exportData);
+  els.syncStayLocalButton.addEventListener("click", () => {
+    if (els.syncChoiceDialog.open) els.syncChoiceDialog.close();
+    setSyncFeedback("Stayed local. Nothing was uploaded or replaced.", "ok");
+  });
   els.rhythmAlertButton.addEventListener("click", enableRhythmAlerts);
   els.importFile.addEventListener("change", () => {
     const [file] = els.importFile.files;
@@ -4623,6 +4938,7 @@ function render() {
 populateFormSelects();
 bindEvents();
 render();
+restoreSyncSession();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

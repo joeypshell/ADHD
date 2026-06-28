@@ -1147,6 +1147,42 @@ textarea {
   gap: 8px;
 }
 
+.sync-email-row {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.sync-email-row[hidden] {
+  display: none;
+}
+
+.sync-email-row input {
+  width: 100%;
+}
+
+.sync-choice-card {
+  gap: 14px;
+}
+
+.sync-choice-summary {
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--teal) 18%, var(--line));
+  border-radius: 14px;
+  color: var(--teal);
+  background: var(--teal-soft);
+  font-size: 0.92rem;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.sync-choice-actions {
+  display: grid;
+  gap: 9px;
+}
+
 .small-copy {
   font-size: 0.82rem;
 }
