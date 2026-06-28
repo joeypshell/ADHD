@@ -1356,7 +1356,7 @@ textarea {
 
 .today-timeline {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 8px;
 }
 
@@ -1384,6 +1384,11 @@ textarea {
 .timeline-missed {
   border-color: color-mix(in srgb, var(--coral) 20%, var(--line));
   background: color-mix(in srgb, var(--coral-soft) 30%, #fff);
+}
+
+.timeline-done {
+  border-color: color-mix(in srgb, var(--green) 18%, var(--line));
+  background: color-mix(in srgb, var(--green-soft) 28%, #fff);
 }
 
 .timeline-head {
@@ -1481,7 +1486,7 @@ textarea {
 
 .today-queue-list {
   display: grid;
-  gap: 7px;
+  gap: 12px;
 }
 
 .queue-count {
@@ -1547,6 +1552,20 @@ textarea {
 
 .today-queue-row.status-waiting {
   background: color-mix(in srgb, var(--gold-soft) 38%, #fff);
+}
+
+.today-queue-row.is-done-today {
+  color: color-mix(in srgb, var(--ink) 70%, var(--muted));
+  background: color-mix(in srgb, var(--green-soft) 24%, #fff);
+  border-color: color-mix(in srgb, var(--green) 14%, var(--line));
+  box-shadow: none;
+}
+
+.today-queue-row.is-done-today .queue-copy strong,
+.today-queue-row.is-done-today .queue-copy span {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: color-mix(in srgb, var(--green) 38%, transparent);
 }
 
 .queue-rank {
@@ -1618,10 +1637,60 @@ textarea {
   font-weight: 950;
 }
 
+.queue-done-button:disabled {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--green-soft) 34%, #fff);
+  border-color: var(--line);
+  cursor: default;
+}
+
 .queue-done-button:hover {
   color: #fff;
   background: var(--green);
   border-color: var(--green);
+}
+
+.queue-done-button:disabled:hover {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--green-soft) 34%, #fff);
+  border-color: var(--line);
+}
+
+.today-queue-group {
+  display: grid;
+  gap: 7px;
+}
+
+.today-queue-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.today-queue-group-heading span {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  color: var(--teal);
+  background: var(--teal-soft);
+  border-radius: 999px;
+}
+
+.today-queue-group-list {
+  display: grid;
+  gap: 7px;
+}
+
+.queue-group-done .today-queue-group-heading span {
+  color: var(--green);
+  background: var(--green-soft);
 }
 
 .item-actions,

@@ -193,7 +193,7 @@ const STARTER_RHYTHM_TITLES = new Set([
 ]);
 
 const DEFAULT_DATA = {
-  version: 5,
+  version: 7,
   createdAt: new Date().toISOString(),
   lastReviewed: "",
   lastBackupAt: "",
@@ -547,6 +547,7 @@ function createRhythmItem(input = {}) {
     createdAt: input.createdAt || new Date().toISOString(),
     updatedAt: input.updatedAt || new Date().toISOString(),
     lastTouched: input.lastTouched || input.updatedAt || input.createdAt || "",
+    completedAt: input.completedAt || "",
     snoozedUntil: input.snoozedUntil || "",
     snoozeCount: Number(input.snoozeCount || 0),
     steps: normalizeSteps(input.steps || [minimum], minimum)
@@ -691,7 +692,7 @@ function normalizeData(data) {
   const normalized = {
     ...cloneData(DEFAULT_DATA),
     ...data,
-    version: 6,
+    version: 7,
     lastBackupAt: data.lastBackupAt || "",
     mode: DASHBOARD_MODES.some((mode) => mode.id === data.mode) ? data.mode : "home",
     filter: { area: "all", status: "", kind: "", ...(data.filter || {}) },
@@ -745,6 +746,7 @@ function normalizeItem(item) {
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || new Date().toISOString(),
     lastTouched: item.lastTouched || item.updatedAt || item.createdAt || "",
+    completedAt: item.completedAt || (item.status === "done" ? item.updatedAt || "" : ""),
     snoozedUntil: item.snoozedUntil || "",
     snoozeCount: Number(item.snoozeCount || 0),
     steps
@@ -793,6 +795,7 @@ function normalizeRhythmItem(item) {
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || new Date().toISOString(),
     lastTouched: item.lastTouched || item.updatedAt || item.createdAt || "",
+    completedAt: item.completedAt || "",
     snoozedUntil: item.snoozedUntil || "",
     snoozeCount: Number(item.snoozeCount || 0),
     steps
@@ -904,9 +907,12 @@ function updateItem(id, patch, options = {}) {
   state.items = state.items.map((item) => {
     if (item.id !== id) return item;
     const now = new Date().toISOString();
+    const completing = patch.status === "done" && item.status !== "done";
+    const reopening = patch.status && patch.status !== "done";
     return {
       ...item,
       ...patch,
+      completedAt: completing ? now : reopening ? "" : (patch.completedAt ?? item.completedAt),
       updatedAt: now,
       lastTouched: options.touch === false ? item.lastTouched : now
     };
@@ -952,6 +958,7 @@ function addItem(input) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       lastTouched: "",
+      completedAt: input.completedAt || "",
       steps: normalizeSteps(input.steps || [], defaultAction)
     }]
   }).items[0];
@@ -1628,6 +1635,7 @@ function completeCurrentStep(itemId) {
     step.done = true;
     const finished = item.steps.every((entry) => entry.done);
     item.status = finished ? "done" : item.status === "inbox" ? "active" : item.status;
+    if (finished) item.completedAt = new Date().toISOString();
     clearFocusForItem(itemId);
     item.updatedAt = new Date().toISOString();
     item.lastTouched = item.updatedAt;
@@ -1657,6 +1665,7 @@ function markRhythmDone(item) {
   item.nextDue = nextRhythmDue(item.lastDone, item.cadence);
   item.status = "active";
   item.snoozedUntil = "";
+  item.completedAt = now;
   item.steps = item.steps.map((step) => ({ ...step, done: false }));
   item.updatedAt = now;
   item.lastTouched = now;
@@ -1686,6 +1695,12 @@ function isSnoozed(item) {
 
 function isOpen(item) {
   return item.status !== "done" && item.status !== "paused";
+}
+
+function isCompletedToday(item) {
+  if (!item) return false;
+  if (isRhythm(item) && item.lastDone === todayIso()) return true;
+  return item.status === "done" && String(item.completedAt || item.updatedAt || "").slice(0, 10) === todayIso();
 }
 
 function isUserVisibleItem(item) {
@@ -1754,6 +1769,7 @@ function focusSessionStateText(session = activeFocusSession()) {
 
 function scoreItem(item) {
   if (!isOpen(item) || isSnoozed(item) || !isUserVisibleItem(item)) return -9999;
+  if (isCompletedToday(item)) return -9999;
 
   let score = 0;
   if (item.status === "now") score += 120;
@@ -1878,22 +1894,30 @@ function todayCandidateReason(item) {
   const dueDays = daysUntil(isRhythm(item) ? item.nextDue : item.due);
   const reviewDays = daysUntil(item.review);
   const window = timeWindowStatus(item);
+  const rhythmDueToday = isRhythm(item) && dueDays !== null && dueDays <= 0;
+  if (isCompletedToday(item)) return "done today";
   if (isFocusItem(item)) return "focus running";
   if (item.status === "now") return "doing now";
   if (item.status === "red") return "red zone";
   if (isPlannedToday(item)) return "planned today";
   if (isCapturedToday(item)) return "captured today";
-  if (isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "rhythm overdue" : "rhythm due";
+  if (rhythmDueToday) return dueDays < 0 ? "rhythm overdue" : "rhythm due";
   if (!isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "overdue" : "due today";
   if (reviewDays !== null && reviewDays <= 0 && item.waitingFor.trim()) return "waiting checkback";
   if (reviewDays !== null && reviewDays <= 0) return "review due";
-  if (window.include) return window.state === "missed" ? `${window.label} passed` : window.label;
+  if (window.include && (!isRhythm(item) || rhythmDueToday || item.cadence === "asneeded")) return window.state === "missed" ? `${window.label} passed` : window.label;
   return "";
 }
 
 function isTodayCandidate(item, mode = dashboardMode()) {
-  if (!isOpen(item) || isSnoozed(item) || !isUserVisibleItem(item) || !itemMatchesMode(item, mode)) return false;
+  if (!isOpen(item) || isSnoozed(item) || isCompletedToday(item) || !isUserVisibleItem(item) || !itemMatchesMode(item, mode)) return false;
   return Boolean(todayCandidateReason(item));
+}
+
+function isTodayDashboardItem(item, mode = dashboardMode()) {
+  if (!isUserVisibleItem(item) || !itemMatchesMode(item, mode)) return false;
+  if (isCompletedToday(item)) return true;
+  return isTodayCandidate(item, mode);
 }
 
 function todayQueueScore(item) {
@@ -1931,6 +1955,22 @@ function todayCandidateEntries(mode = dashboardMode()) {
     .sort((a, b) => b.score - a.score || sortDateValue(a.item).localeCompare(sortDateValue(b.item)));
 }
 
+function todayDashboardEntries(mode = dashboardMode()) {
+  return state.items
+    .filter((item) => isTodayDashboardItem(item, mode))
+    .map((item) => ({
+      item,
+      score: isCompletedToday(item) ? -1 : todayQueueScore(item),
+      reason: todayCandidateReason(item)
+    }))
+    .sort((a, b) => {
+      const aDone = isCompletedToday(a.item);
+      const bDone = isCompletedToday(b.item);
+      if (aDone !== bDone) return aDone ? 1 : -1;
+      return b.score - a.score || sortDateValue(a.item).localeCompare(sortDateValue(b.item));
+    });
+}
+
 function fallbackTodayEntries(limit = 1, mode = dashboardMode()) {
   return recommendedItems(mode)
     .slice(0, limit)
@@ -1945,7 +1985,7 @@ function todayQueueEntries(limit = Infinity, mode = dashboardMode()) {
 
 function recommendedItems(mode = dashboardMode()) {
   return state.items
-    .filter((item) => isOpen(item) && !isSnoozed(item) && itemMatchesMode(item, mode))
+    .filter((item) => isOpen(item) && !isSnoozed(item) && !isCompletedToday(item) && itemMatchesMode(item, mode))
     .map((item) => ({ item, score: scoreItem(item) }))
     .filter((entry) => entry.score > -9999)
     .sort((a, b) => b.score - a.score || sortDateValue(a.item).localeCompare(sortDateValue(b.item)));
@@ -2077,6 +2117,7 @@ function itemGlyph(item) {
 function timelineBucket(entry, topItemId) {
   const item = entry.item;
   const window = timeWindowStatus(item);
+  if (isCompletedToday(item)) return "done";
   if (item.id === topItemId || isFocusItem(item) || item.status === "now") return "now";
   if (window.state === "missed") return "missed";
   if (window.state === "upcoming" || window.state === "future") return "later";
@@ -2090,7 +2131,8 @@ function renderTodayTimeline(entries, topItemId = "") {
     { id: "now", label: "Now" },
     { id: "next", label: "Next" },
     { id: "later", label: "Later" },
-    { id: "missed", label: "Missed" }
+    { id: "missed", label: "Missed" },
+    { id: "done", label: "Done" }
   ];
   const buckets = Object.fromEntries(groups.map((group) => [group.id, []]));
   entries.forEach((entry) => {
@@ -2301,6 +2343,7 @@ function clearCheckin() {
 
 function renderRecommendation() {
   const todayEntries = todayCandidateEntries();
+  const dashboardEntries = todayDashboardEntries();
   const entries = todayEntries.length ? todayEntries : fallbackTodayEntries(1);
   const [top] = entries;
   if (els.todayModeLabel) els.todayModeLabel.textContent = `${modeMeta().label} mode`;
@@ -2310,9 +2353,9 @@ function renderRecommendation() {
   }
   els.modeButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.modeOption === dashboardMode()));
   document.body.dataset.mode = dashboardMode();
-  if (els.todayQueueCount) els.todayQueueCount.textContent = `${todayEntries.length} ${todayEntries.length === 1 ? "task" : "tasks"}`;
+  if (els.todayQueueCount) els.todayQueueCount.textContent = `${dashboardEntries.length} ${dashboardEntries.length === 1 ? "task" : "tasks"}`;
   els.recommendationPanel.replaceChildren();
-  renderTodayTimeline(todayEntries, top?.item.id || "");
+  renderTodayTimeline(dashboardEntries, top?.item.id || "");
   if (els.todayQueueList) els.todayQueueList.replaceChildren();
 
   if (!top) {
@@ -2328,16 +2371,21 @@ function renderRecommendation() {
     const body = document.createElement("div");
     body.className = "next-card-body";
     const title = document.createElement("h3");
-    title.textContent = "Add the first thing for today";
+    title.textContent = dashboardEntries.length ? "Today is clear" : "Add the first thing for today";
     const copy = document.createElement("p");
-    copy.textContent = `No ${modeMeta().label.toLowerCase()} item is asking for attention yet.`;
+    copy.textContent = dashboardEntries.length
+      ? `No ${modeMeta().label.toLowerCase()} item is asking for attention right now.`
+      : `No ${modeMeta().label.toLowerCase()} item is asking for attention yet.`;
     const actions = document.createElement("div");
     actions.className = "now-actions";
     actions.append(createButton("Add item", "primary-button", () => showView("wizard")));
     body.append(title, copy, actions);
     panel.append(band, body);
     els.recommendationPanel.append(panel);
-    if (els.todayQueueList) els.todayQueueList.append(makeEmpty("Nothing has to be done today in this mode"));
+    if (els.todayQueueList) {
+      if (dashboardEntries.length) renderTodayQueueList(dashboardEntries, "");
+      else els.todayQueueList.append(makeEmpty("Nothing has to be done today in this mode"));
+    }
     return;
   }
 
@@ -2435,18 +2483,60 @@ function renderRecommendation() {
   panel.append(band, body);
   els.recommendationPanel.append(panel);
   if (els.todayQueueList) {
-    if (todayEntries.length) {
-      todayEntries.forEach((entry, index) => els.todayQueueList.append(makeTodayQueueRow(entry, index, entry.item.id === item.id)));
+    if (dashboardEntries.length) {
+      renderTodayQueueList(dashboardEntries, item.id);
     } else {
       els.todayQueueList.append(makeEmpty("No must-do items today"));
     }
   }
 }
 
+function todayQueueGroup(entry, topItemId = "") {
+  return timelineBucket(entry, topItemId);
+}
+
+function renderTodayQueueList(entries, topItemId = "") {
+  if (!els.todayQueueList) return;
+  els.todayQueueList.replaceChildren();
+  const groups = [
+    { id: "now", label: "Now" },
+    { id: "next", label: "Next" },
+    { id: "later", label: "Later" },
+    { id: "missed", label: "Missed" },
+    { id: "done", label: "Done" }
+  ];
+  const buckets = Object.fromEntries(groups.map((group) => [group.id, []]));
+  entries.forEach((entry) => buckets[todayQueueGroup(entry, topItemId)].push(entry));
+
+  let rank = 1;
+  groups.forEach((group) => {
+    const bucket = buckets[group.id];
+    if (!bucket.length) return;
+    const section = document.createElement("section");
+    section.className = `today-queue-group queue-group-${group.id}`;
+    const heading = document.createElement("div");
+    heading.className = "today-queue-group-heading";
+    const title = document.createElement("strong");
+    title.textContent = group.label;
+    const count = document.createElement("span");
+    count.textContent = String(bucket.length);
+    heading.append(title, count);
+    const list = document.createElement("div");
+    list.className = "today-queue-group-list";
+    bucket.forEach((entry) => {
+      list.append(makeTodayQueueRow(entry, rank, entry.item.id === topItemId));
+      if (!isCompletedToday(entry.item)) rank += 1;
+    });
+    section.append(heading, list);
+    els.todayQueueList.append(section);
+  });
+}
+
 function makeTodayQueueRow(entry, index, isCurrent = false) {
   const item = entry.item;
+  const doneToday = isCompletedToday(item);
   const row = document.createElement("article");
-  row.className = `today-queue-row status-${item.status} tone-${itemTone(item)}${isCurrent ? " is-current" : ""}`;
+  row.className = `today-queue-row status-${item.status} tone-${itemTone(item)}${isCurrent ? " is-current" : ""}${doneToday ? " is-done-today" : ""}`;
   if (isCurrent) row.setAttribute("aria-current", "true");
 
   const openButton = document.createElement("button");
@@ -2456,24 +2546,25 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
 
   const rank = document.createElement("span");
   rank.className = "queue-rank";
-  rank.textContent = String(index + 1);
+  rank.textContent = doneToday ? "OK" : String(index);
 
   const copy = document.createElement("span");
   copy.className = "queue-copy";
   const title = document.createElement("strong");
   title.textContent = item.title;
   const detail = document.createElement("span");
-  detail.textContent = currentTinyStep(item);
+  detail.textContent = doneToday ? "Done today" : currentTinyStep(item);
   copy.append(title, detail);
 
   const meta = document.createElement("span");
   meta.className = "queue-meta";
-  meta.textContent = [isCurrent ? "Next" : "", entry.reason, formatTimeWindow(item), `${item.estimate} min`].filter(Boolean).join(" / ");
+  meta.textContent = [isCurrent ? "Next" : "", entry.reason, formatTimeWindow(item), doneToday ? "" : `${item.estimate} min`].filter(Boolean).join(" / ");
 
   const doneButton = document.createElement("button");
   doneButton.type = "button";
   doneButton.className = "queue-done-button";
   doneButton.textContent = "Done";
+  doneButton.disabled = doneToday;
   doneButton.setAttribute("aria-label", `Mark ${item.title} done`);
   doneButton.addEventListener("click", () => completeItem(item.id));
 
@@ -3321,6 +3412,7 @@ function startFocusSession(itemId, minutes, options = {}) {
   if (["inbox", "active", "later"].includes(item.status)) item.status = "now";
   item.plannedFor = todayIso();
   item.snoozedUntil = "";
+  item.completedAt = "";
   item.updatedAt = now.toISOString();
   item.lastTouched = now.toISOString();
   saveState();

@@ -63,10 +63,13 @@ Important item fields:
 - `importance`
 - `dread`
 - `snoozeCount`
+- `completedAt`
 
 ## Today Generation
 
 The Today dashboard is automatic. It does not depend on launching or planning a day.
+
+Rhythms act as virtual generated tasks for the current day. A rhythm appears on Today when its cadence says it is due or overdue, then its time window changes priority and bucket placement. Completing a rhythm records `lastDone`, advances `nextDue`, and keeps a completed-today row visible on the dashboard for the rest of the day.
 
 Items enter Today when they are:
 
@@ -78,10 +81,13 @@ Items enter Today when they are:
 - review due
 - waiting checkback due
 - rhythm due or overdue
-- active in the current or upcoming time window
-- missed from an earlier time window
+- active in the current or upcoming time window, for one-off items and rhythms due today
+- missed from an earlier time window, for one-off items and rhythms due today
+- completed today
 
-The top recommendation comes from deterministic scoring in `todayQueueScore()`. The complete list comes from `todayCandidateEntries()`.
+The top recommendation comes from deterministic scoring in `todayQueueScore()` over unfinished `todayCandidateEntries()`.
+
+The Today recommendation intentionally excludes completed-today items. The Today queue uses `todayDashboardEntries()` so it can show the whole day grouped as Now / Next / Later / Missed / Done.
 
 The optional daily check-in can adjust scoring for the current day:
 
