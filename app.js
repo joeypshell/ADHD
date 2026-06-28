@@ -1877,6 +1877,33 @@ function createButton(label, className, onClick) {
   return button;
 }
 
+function makeNextDetail(label, value, variant = "") {
+  const row = document.createElement("div");
+  row.className = `next-detail ${variant}`.trim();
+  const small = document.createElement("span");
+  small.textContent = label;
+  const strong = document.createElement("strong");
+  strong.textContent = value;
+  row.append(small, strong);
+  return row;
+}
+
+function nextIconText(item) {
+  if (item.status === "red") return "!";
+  if (item.status === "waiting") return "...";
+  if (isRhythm(item)) return "R";
+  if (item.mode === "work") return "W";
+  return "H";
+}
+
+function priorityPillText(item, reason) {
+  if (isFocusItem(item)) return "In progress";
+  if (item.status === "red") return "Red zone";
+  if (reason && reason !== "next active") return reason;
+  if (isRhythm(item)) return rhythmDueLabel(item);
+  return statusLabel(item.status);
+}
+
 function makeEmpty(text) {
   const empty = document.createElement("div");
   empty.className = "empty-state";
@@ -1969,6 +1996,15 @@ function renderRecommendation() {
   if (!top) {
     const panel = document.createElement("article");
     panel.className = "now-card empty-now";
+    const band = document.createElement("div");
+    band.className = "next-band";
+    const bandLabel = document.createElement("span");
+    bandLabel.textContent = "Automatic queue";
+    const bandPill = document.createElement("strong");
+    bandPill.textContent = modeMeta().label;
+    band.append(bandLabel, bandPill);
+    const body = document.createElement("div");
+    body.className = "next-card-body";
     const title = document.createElement("h3");
     title.textContent = "Add the first thing for today";
     const copy = document.createElement("p");
@@ -1976,7 +2012,8 @@ function renderRecommendation() {
     const actions = document.createElement("div");
     actions.className = "now-actions";
     actions.append(createButton("Add item", "primary-button", () => showView("wizard")));
-    panel.append(title, copy, actions);
+    body.append(title, copy, actions);
+    panel.append(band, body);
     els.recommendationPanel.append(panel);
     if (els.todayQueueList) els.todayQueueList.append(makeEmpty("Nothing queued for this mode"));
     return;
@@ -1986,62 +2023,83 @@ function renderRecommendation() {
   const panel = document.createElement("article");
   panel.className = `now-card status-${item.status}`;
 
-  const meta = document.createElement("p");
+  const band = document.createElement("div");
+  band.className = "next-band";
+  const bandLabel = document.createElement("span");
+  bandLabel.textContent = "Recommended next action";
+  const bandPill = document.createElement("strong");
+  bandPill.textContent = priorityPillText(item, top.reason);
+  band.append(bandLabel, bandPill);
+
+  const body = document.createElement("div");
+  body.className = "next-card-body";
+
+  const main = document.createElement("button");
+  main.type = "button";
+  main.className = "next-main";
+  main.addEventListener("click", () => openDetail(item.id));
+  const icon = document.createElement("span");
+  icon.className = "next-icon";
+  icon.textContent = nextIconText(item);
+  const titleWrap = document.createElement("span");
+  titleWrap.className = "next-title-wrap";
+  const meta = document.createElement("span");
   meta.className = "item-meta";
   meta.textContent = nextCardMeta(item, top.reason);
-
   const title = document.createElement("h3");
   title.textContent = item.title;
+  const openHint = document.createElement("span");
+  openHint.className = "next-open-hint";
+  openHint.textContent = "Open details";
+  titleWrap.append(meta, title, openHint);
+  main.append(icon, titleWrap);
 
-  const reasonRow = document.createElement("div");
-  reasonRow.className = "reason-row";
-  recommendationReason(item).forEach((reason, index) => {
-    reasonRow.append(makeChip(reason, index === 0 ? "strong" : ""));
-  });
-
-  const tiny = document.createElement("div");
-  tiny.className = "tiny-start";
-  const tinyLabel = document.createElement("span");
-  tinyLabel.textContent = "Tiny start";
-  const tinyText = document.createElement("strong");
-  tinyText.textContent = currentTinyStep(item);
-  tiny.append(tinyLabel, tinyText);
+  const doneSteps = item.steps.filter((step) => step.done).length;
+  const timeText = isRhythm(item)
+    ? `${item.estimate} min minimum / ${cadenceMeta(item.cadence).label}${item.lastDone ? ` / last done ${formatDate(item.lastDone)}` : ""}`
+    : `${item.estimate} min / ${doneSteps} of ${item.steps.length || 1} steps`;
+  const whyText = item.consequence.trim() || top.reason || recommendationReason(item)[0] || item.area;
+  const detailGrid = document.createElement("div");
+  detailGrid.className = "next-detail-grid";
+  detailGrid.append(
+    makeNextDetail("Why", whyText, "why"),
+    makeNextDetail("Tiny start", currentTinyStep(item), "tiny"),
+    makeNextDetail("Time", timeText, "time")
+  );
 
   const progress = document.createElement("div");
-  progress.className = "progress-line";
+  progress.className = "progress-line next-progress";
   progress.setAttribute("aria-hidden", "true");
   const progressBar = document.createElement("span");
   progressBar.style.width = `${itemProgress(item)}%`;
   progress.append(progressBar);
 
-  const stepMeta = document.createElement("p");
-  stepMeta.className = "soft-copy";
-  const doneSteps = item.steps.filter((step) => step.done).length;
-  stepMeta.textContent = isRhythm(item)
-    ? `${item.estimate} min minimum / ${cadenceMeta(item.cadence).label}${item.lastDone ? ` / last done ${formatDate(item.lastDone)}` : ""}`
-    : `${item.estimate} min / ${doneSteps} of ${item.steps.length || 1} steps`;
-
   const actions = document.createElement("div");
   actions.className = "now-actions";
-  actions.append(createButton(isFocusItem(item) ? "Resume" : "Start", "primary-button", () => {
+  actions.append(createButton(isFocusItem(item) ? "Resume" : "Start", "primary-button action-button", () => {
     if (isFocusItem(item)) openFocusDialog();
     else startFocusSession(item.id);
   }));
-  actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button", () => completeCurrentStep(item.id)));
-  actions.append(createButton("Snooze", "secondary-button", () => snoozeItem(item.id, "hour")));
+  actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button action-button", () => completeCurrentStep(item.id)));
+  actions.append(createButton("Snooze", "secondary-button action-button", () => snoozeItem(item.id, "hour")));
   if (isProject(item)) {
-    actions.append(
-      createButton("Stuck", "secondary-button", () => openStuck(item.id)),
-      createButton("Break down", "secondary-button", () => addBreakdown(item.id))
-    );
+    actions.append(createButton("Stuck", "secondary-button action-button", () => openStuck(item.id)));
+  } else {
+    actions.append(createButton("Details", "secondary-button action-button", () => openDetail(item.id)));
   }
 
-  panel.append(meta, title, reasonRow, tiny, progress, stepMeta);
-  if (isFocusItem(item)) panel.append(makeFocusPill(item));
-  panel.append(actions);
+  body.append(main, detailGrid, progress);
+  if (isFocusItem(item)) body.append(makeFocusPill(item));
+  body.append(actions);
+  panel.append(band, body);
   els.recommendationPanel.append(panel);
   if (els.todayQueueList) {
-    entries.forEach((entry, index) => els.todayQueueList.append(makeTodayQueueRow(entry, index)));
+    const queue = entries.slice(1);
+    if (queue.length) {
+      queue.forEach((entry, index) => els.todayQueueList.append(makeTodayQueueRow(entry, index)));
+    } else {
+      els.todayQueueList.append(makeEmpty("Nothing else is queued"));
+    }
   }
 }
 
