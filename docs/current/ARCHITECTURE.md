@@ -99,9 +99,9 @@ The Today recommendation intentionally excludes completed-today items. The Today
 The optional daily check-in can adjust scoring for the current day:
 
 - energy: low, medium, high
-- brain state: clear, foggy, avoiding, overloaded
+- brain state: ready, foggy, avoiding, overloaded
 
-The check-in is local and resets when stale. The Today screen explains the selected check-in effect and adds matching reason chips to the recommendation when those rules affect the top item.
+The check-in is local and resets when stale. The stored value for Ready remains `clear` for compatibility. The Today screen explains the selected check-in effect and adds matching reason chips to the recommendation when those rules affect the top item.
 
 ## Time Windows
 
@@ -126,6 +126,8 @@ Today:
 - visual timeline: Now / Next / Later / Missed
 - complete Today list
 - quick capture
+
+Doing and timers are intentionally separate. `status: "now"` means the item is being worked on or should stay at the top; a `focusSession` exists only when the user explicitly starts the timer. Today and item detail use explicit snooze destinations: 15 minutes, 1 hour, tonight, or tomorrow.
 
 Add:
 
@@ -162,7 +164,7 @@ Focus state is stored in `state.focusSession`. It tracks:
 - `alertEnabled`
 - `notifiedAt`
 
-The Today recommendation card can start, pause, resume, snooze, and complete focus sessions. Notifications are limited to focus-timer permission and do not yet cover a broader reminder system.
+The Today recommendation card can mark an item as Doing, start a timer, pause, resume, pick an explicit snooze destination, and complete focus sessions. Notifications are limited to focus-timer permission and do not yet cover a broader reminder system.
 
 An active focus session also renders a sticky Today anchor with:
 
@@ -170,7 +172,7 @@ An active focus session also renders a sticky Today anchor with:
 - tiny step
 - remaining time
 - progress
-- Done step / Pause / Snooze / +5 min
+- Done step / Pause / 1 hour / +5 min
 
 ## Notifications
 

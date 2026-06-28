@@ -411,6 +411,7 @@ const els = {
   focusPauseButton: document.querySelector("#focusPauseButton"),
   focusAddFiveButton: document.querySelector("#focusAddFiveButton"),
   focusSnoozeButton: document.querySelector("#focusSnoozeButton"),
+  focusSnoozeChoices: document.querySelector("#focusSnoozeChoices"),
   focusNotifyButton: document.querySelector("#focusNotifyButton"),
   closeFocusButton: document.querySelector("#closeFocusButton"),
   deleteItemButton: document.querySelector("#deleteItemButton"),
@@ -611,6 +612,19 @@ function tomorrowAt(hour) {
 function addHours(hours) {
   const date = new Date();
   date.setHours(date.getHours() + hours);
+  return date.toISOString();
+}
+
+function addMinutes(minutes) {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() + minutes);
+  return date.toISOString();
+}
+
+function nextAtHour(hour) {
+  const date = new Date();
+  date.setHours(hour, 0, 0, 0);
+  if (date.getTime() <= Date.now()) date.setDate(date.getDate() + 1);
   return date.toISOString();
 }
 
@@ -1976,7 +1990,7 @@ function checkinEffectMessages(checkin = normalizeDailyCheckin(state.dailyChecki
     high: "High energy: boosts red-zone, important, and longer low-dread tasks."
   };
   const brainMessages = {
-    clear: "Clear: gives important tasks a small boost.",
+    clear: "Ready: gives important tasks a small boost.",
     foggy: "Foggy: boosts short, concrete tasks with few steps.",
     avoiding: "Avoiding: boosts short, scary, consequence-heavy tasks.",
     overloaded: "Overloaded: boosts rhythms, waiting checkbacks, and very small tasks."
@@ -2018,7 +2032,7 @@ function checkinReasonsForItem(item) {
     if (item.status === "waiting") reasons.push("overloaded: waiting checkback");
     if (item.estimate >= 30) reasons.push("overloaded: long task lowered");
   } else if (checkin.brain === "clear") {
-    if (item.importance >= 4) reasons.push("clear: important");
+    if (item.importance >= 4) reasons.push("ready: important");
   }
 
   return [...new Set(reasons)];
@@ -2225,6 +2239,25 @@ function createButton(label, className, onClick) {
   button.textContent = label;
   button.addEventListener("click", onClick);
   return button;
+}
+
+const SNOOZE_OPTIONS = [
+  { id: "15min", label: "15 min" },
+  { id: "hour", label: "1 hour" },
+  { id: "tonight", label: "Tonight" },
+  { id: "tomorrow", label: "Tomorrow" }
+];
+
+function makeSnoozeChoices(itemId, afterSnooze = () => {}) {
+  const choices = document.createElement("div");
+  choices.className = "snooze-choices";
+  SNOOZE_OPTIONS.forEach((option) => {
+    choices.append(createButton(option.label, "secondary-button snooze-choice-button", () => {
+      snoozeItem(itemId, option.id);
+      afterSnooze();
+    }));
+  });
+  return choices;
 }
 
 function makeNextDetail(label, value, variant = "") {
@@ -2446,7 +2479,7 @@ function renderFocusAnchor() {
   actions.append(
     createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button small-button", completeFocusSession),
     createButton(session.running ? "Pause" : "Resume", "secondary-button small-button", pauseFocusSession),
-    createButton("Snooze", "secondary-button small-button", snoozeFocusSession),
+    createButton("1 hour", "secondary-button small-button", () => snoozeFocusSession("hour")),
     createButton("+5 min", "secondary-button small-button", () => extendFocusSession(5))
   );
 
@@ -2734,7 +2767,6 @@ function renderRecommendation() {
   if (session) {
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeCurrentStep(item.id)));
     actions.append(createButton(session.running ? "Pause" : "Resume", "secondary-button action-button", pauseFocusSession));
-    actions.append(createButton("Snooze", "secondary-button action-button", () => snoozeFocusSession()));
     actions.append(createButton(isProject(item) ? "Stuck" : "Timer", "secondary-button action-button", () => {
       if (isProject(item)) openStuck(item.id);
       else openFocusDialog();
@@ -2742,15 +2774,14 @@ function renderRecommendation() {
   } else if (item.status === "now") {
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeCurrentStep(item.id)));
     actions.append(createButton("Start timer", "secondary-button action-button", () => startFocusSession(item.id)));
-    actions.append(createButton("Snooze", "secondary-button action-button", () => snoozeItem(item.id, "hour")));
     actions.append(createButton(isProject(item) ? "Stuck" : "Details", "secondary-button action-button", () => {
       if (isProject(item)) openStuck(item.id);
       else openDetail(item.id);
     }));
   } else {
-    actions.append(createButton("Start doing", "primary-button action-button", () => startFocusSession(item.id)));
+    actions.append(createButton("Start doing", "primary-button action-button", () => startDoingItem(item.id)));
+    actions.append(createButton("Timer", "secondary-button action-button", () => startFocusSession(item.id)));
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button action-button", () => completeCurrentStep(item.id)));
-    actions.append(createButton("Snooze", "secondary-button action-button", () => snoozeItem(item.id, "hour")));
     actions.append(createButton(isProject(item) ? "Stuck" : "Details", "secondary-button action-button", () => {
       if (isProject(item)) openStuck(item.id);
       else openDetail(item.id);
@@ -2759,7 +2790,7 @@ function renderRecommendation() {
 
   body.append(main, detailGrid, reasonStrip, progress);
   if (isFocusItem(item)) body.append(makeFocusPill(item));
-  body.append(actions);
+  body.append(actions, makeSnoozeChoices(item.id));
   panel.append(band, body);
   els.recommendationPanel.append(panel);
   if (els.todayQueueList) {
@@ -2999,10 +3030,10 @@ function makeRhythmCard(item, compact = false) {
   actions.append(
     createButton("Done", "primary-button", () => completeRhythm(item.id)),
     createButton("Make now", "secondary-button", () => {
-      updateItem(item.id, { status: "now", snoozedUntil: "", plannedFor: todayIso() });
+      startDoingItem(item.id);
       showView("now");
     }),
-    createButton("Snooze", "secondary-button", () => snoozeItem(item.id, "tomorrow")),
+    createButton("Tomorrow", "secondary-button", () => snoozeItem(item.id, "tomorrow")),
     createButton("Edit", "ghost-button", () => openEdit(item.id))
   );
 
@@ -3548,17 +3579,19 @@ function renderDetail(item) {
 
   const actions = document.createElement("div");
   actions.className = "detail-actions";
-  actions.append(createButton(isFocusItem(item) ? "Resume" : "Start", "primary-button", () => {
+  actions.append(createButton(isFocusItem(item) ? "Resume timer" : item.status === "now" ? "Doing" : "Start doing", "primary-button", () => {
     els.detailDialog.close();
     if (isFocusItem(item)) openFocusDialog();
-    else startFocusSession(item.id);
+    else startDoingItem(item.id);
   }));
+  if (!isFocusItem(item)) {
+    actions.append(createButton("Timer", "secondary-button", () => {
+      els.detailDialog.close();
+      startFocusSession(item.id);
+    }));
+  }
   actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button", () => {
     completeCurrentStep(item.id);
-    els.detailDialog.close();
-  }));
-  actions.append(createButton("Snooze", "secondary-button", () => {
-    snoozeItem(item.id, "hour");
     els.detailDialog.close();
   }));
   if (isProject(item)) {
@@ -3579,7 +3612,9 @@ function renderDetail(item) {
     openEdit(item.id);
   }));
 
-  els.detailBody.append(summary, steps, actions);
+  els.detailBody.append(summary, steps, actions, makeSnoozeChoices(item.id, () => {
+    if (els.detailDialog.open) els.detailDialog.close();
+  }));
 }
 
 function openEdit(itemId) {
@@ -3693,11 +3728,33 @@ function addBreakdown(itemId) {
 function snoozeItem(itemId, duration) {
   const item = getItem(itemId);
   if (!item) return;
-  const snoozedUntil = duration === "tomorrow" ? tomorrowAt(9) : addHours(1);
+  const snoozedUntil = {
+    "15min": addMinutes(15),
+    hour: addHours(1),
+    tonight: nextAtHour(18),
+    tomorrow: tomorrowAt(9)
+  }[duration] || addHours(1);
   updateItem(itemId, {
     snoozedUntil,
     snoozeCount: item.snoozeCount + 1
   }, { touch: false });
+  syncFocusTimer();
+}
+
+function startDoingItem(itemId) {
+  const item = getItem(itemId);
+  if (!item) return;
+  const now = new Date().toISOString();
+  if (state.focusSession?.itemId === itemId) state.focusSession = null;
+  updateItem(itemId, {
+    status: "now",
+    plannedFor: todayIso(),
+    snoozedUntil: "",
+    completedAt: "",
+    updatedAt: now,
+    lastTouched: now
+  });
+  syncFocusTimer();
 }
 
 function startFocusSession(itemId, minutes, options = {}) {
@@ -3772,6 +3829,12 @@ function updateFocusDisplays() {
   els.focusStep.textContent = currentTinyStep(item);
   els.focusDoneButton.textContent = isRhythm(item) ? "Done today" : "Done step";
   els.focusPauseButton.textContent = session.running ? "Pause" : "Resume";
+  if (els.focusSnoozeChoices) {
+    els.focusSnoozeChoices.replaceChildren();
+    els.focusSnoozeChoices.append(...Array.from(makeSnoozeChoices(item.id, () => {
+      if (els.focusDialog.open) els.focusDialog.close();
+    }).children));
+  }
 
   const canRequestAlert = "Notification" in window;
   els.focusNotifyButton.hidden = !canRequestAlert;
@@ -3867,13 +3930,13 @@ function completeFocusSession() {
   syncFocusTimer();
 }
 
-function snoozeFocusSession() {
+function snoozeFocusSession(duration = "hour") {
   const session = activeFocusSession();
   if (!session) return;
   const itemId = session.itemId;
   state.focusSession = null;
   saveState();
-  snoozeItem(itemId, "hour");
+  snoozeItem(itemId, duration);
   if (els.focusDialog.open) els.focusDialog.close();
   syncFocusTimer();
 }
@@ -3917,8 +3980,7 @@ function handleStuckAction(action) {
     addStep(stuckItemId, "Open this for 5 minutes");
   }
   if (action === "red") updateItem(stuckItemId, { status: "red", snoozedUntil: "" });
-  if (action === "hour") snoozeItem(stuckItemId, "hour");
-  if (action === "tomorrow") snoozeItem(stuckItemId, "tomorrow");
+  if (["15min", "hour", "tonight", "tomorrow"].includes(action)) snoozeItem(stuckItemId, action);
   els.stuckDialog.close();
 }
 
@@ -4150,7 +4212,7 @@ function bindEvents() {
   els.focusDoneButton.addEventListener("click", completeFocusSession);
   els.focusPauseButton.addEventListener("click", pauseFocusSession);
   els.focusAddFiveButton.addEventListener("click", () => extendFocusSession(5));
-  els.focusSnoozeButton.addEventListener("click", snoozeFocusSession);
+  els.focusSnoozeButton.addEventListener("click", () => snoozeFocusSession("hour"));
   els.focusNotifyButton.addEventListener("click", enableFocusAlert);
   els.editForm.addEventListener("submit", saveEdit);
   els.editStepAddButton.addEventListener("click", () => {

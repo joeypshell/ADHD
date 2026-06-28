@@ -57,7 +57,7 @@
               <div>
                 <p class="choice-label">Brain state</p>
                 <div class="segmented-row" id="brainButtons" role="group" aria-label="Brain state">
-                  <button type="button" data-brain="clear">Clear</button>
+                  <button type="button" data-brain="clear">Ready</button>
                   <button type="button" data-brain="foggy">Foggy</button>
                   <button type="button" data-brain="avoiding">Avoiding</button>
                   <button type="button" data-brain="overloaded">Overloaded</button>
@@ -356,9 +356,10 @@
           <button class="primary-button" id="focusDoneButton" type="button">Done step</button>
           <button class="secondary-button" id="focusPauseButton" type="button">Pause</button>
           <button class="secondary-button" id="focusAddFiveButton" type="button">+5 min</button>
-          <button class="secondary-button" id="focusSnoozeButton" type="button">Snooze</button>
+          <button class="secondary-button" id="focusSnoozeButton" type="button">Snooze 1 hour</button>
           <button class="ghost-button" id="focusNotifyButton" type="button">Enable alert</button>
         </div>
+        <div class="snooze-choices focus-snooze-choices" id="focusSnoozeChoices"></div>
       </section>
     </dialog>
 
@@ -497,7 +498,9 @@
         <div class="stuck-actions">
           <button class="secondary-button" type="button" data-stuck-action="tiny">Add 5-minute opener</button>
           <button class="secondary-button" type="button" data-stuck-action="red">Move to Red</button>
+          <button class="secondary-button" type="button" data-stuck-action="15min">Snooze 15 min</button>
           <button class="secondary-button" type="button" data-stuck-action="hour">Snooze 1 hour</button>
+          <button class="secondary-button" type="button" data-stuck-action="tonight">Snooze tonight</button>
           <button class="secondary-button" type="button" data-stuck-action="tomorrow">Snooze tomorrow</button>
         </div>
         <label>
