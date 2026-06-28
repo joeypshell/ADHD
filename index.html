@@ -42,11 +42,10 @@
           <section class="today-queue-shell" aria-labelledby="todayQueueTitle">
             <div class="section-heading compact">
               <div>
-                <p class="eyebrow">Priority order</p>
-                <h2 id="todayQueueTitle">Today queue</h2>
+                <p class="eyebrow">Automatic queue</p>
+                <h2 id="todayQueueTitle">What is next</h2>
               </div>
               <div class="heading-actions">
-                <button class="secondary-button" id="planTodayButton" type="button">Plan today</button>
                 <button class="secondary-button" id="refreshNowButton" type="button">Refresh</button>
               </div>
             </div>
@@ -296,24 +295,6 @@
           <button class="secondary-button" id="focusAddFiveButton" type="button">+5 min</button>
           <button class="secondary-button" id="focusSnoozeButton" type="button">Snooze</button>
           <button class="ghost-button" id="focusNotifyButton" type="button">Enable alert</button>
-        </div>
-      </section>
-    </dialog>
-
-    <dialog id="planDialog">
-      <section class="dialog-card plan-card" aria-labelledby="planTitle">
-        <div class="dialog-heading">
-          <div>
-            <p class="eyebrow" id="planModeLabel">Plan today</p>
-            <h2 id="planTitle">Choose today's queue</h2>
-          </div>
-          <button class="icon-button" type="button" id="closePlanButton" aria-label="Close">x</button>
-        </div>
-        <p class="dialog-copy">Tap the things that should be on deck today. The Today screen will still keep urgent and due items visible.</p>
-        <div class="plan-list" id="planList"></div>
-        <div class="form-actions">
-          <button class="ghost-button" id="clearPlanButton" type="button">Clear today</button>
-          <button class="primary-button" id="savePlanButton" type="button">Done planning</button>
         </div>
       </section>
     </dialog>

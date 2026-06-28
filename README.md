@@ -2,22 +2,16 @@
 
 A static, mobile-first command center for ADHD-style executive function support. It is built for GitHub Pages and runs without a build step.
 
-The primary screen is a Today cockpit: it recommends one clear action, shows a short priority queue, and keeps rhythm/list/map/review views secondary over the same local data.
+The primary screen is an automatic Today queue: it recommends one clear action, shows the next few items that matter now, and keeps rhythm/list/map/review views secondary over the same local data. The user should not have to plan the day manually.
 
 The app has two lanes:
 
 - Projects: finite things with an endpoint, steps, due/review dates, and stuck handling.
 - Rhythms: recurring life rails like cleaning, gas, working out, weekly reset, and annual/admin maintenance.
 
-The Rhythms tab shows recurring loops grouped by due now, coming up, and all rhythms. Missed rhythms stay visible until marked done.
+The Rhythms tab shows recurring loops grouped by due now, coming up, and all rhythms. Missed rhythms stay visible until marked done, and due rhythms flow into Today automatically.
 
-Daily Launch gives the day a shape:
-
-- Anchor task
-- Backup task
-- Minimum viable day
-
-Shutdown captures what changed, shows open-loop counts, and marks the daily rhythm complete.
+Today is generated from recurring items, due/overdue work, review checkbacks, explicit "now" items, and time-window matches. Capture and Wizard entries can be added in batches or whenever motivation appears; they do not all become same-day tasks just because they were created today.
 
 The Add tab starts with three paths: Quick capture, Templates, and Wizard. The Wizard guides setup with three paths:
 

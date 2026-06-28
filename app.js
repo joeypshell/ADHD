@@ -182,28 +182,7 @@ const STARTER_TEMPLATES = [
   }
 ];
 
-const DEFAULT_RHYTHMS = [
-  {
-    title: "Daily launch",
-    area: "Unsorted",
-    mode: "both",
-    timeWindow: "morning",
-    cadence: "daily",
-    trigger: "Before work or messages",
-    minimum: "Pick one action",
-    system: true
-  },
-  {
-    title: "Shutdown",
-    area: "Unsorted",
-    mode: "both",
-    timeWindow: "evening",
-    cadence: "daily",
-    trigger: "End of workday or evening",
-    minimum: "Update the open loops",
-    system: true
-  }
-];
+const DEFAULT_RHYTHMS = [];
 
 const STARTER_RHYTHM_TITLES = new Set([
   "weekly reset",
@@ -292,7 +271,6 @@ const els = {
   todayWindowLabel: document.querySelector("#todayWindowLabel"),
   todayQueueList: document.querySelector("#todayQueueList"),
   modeButtons: document.querySelectorAll("[data-mode-option]"),
-  planTodayButton: document.querySelector("#planTodayButton"),
   quickCaptureForm: document.querySelector("#quickCaptureForm"),
   quickCaptureInput: document.querySelector("#quickCaptureInput"),
   addChoiceButtons: document.querySelectorAll("[data-add-mode]"),
@@ -300,8 +278,6 @@ const els = {
   addCaptureForm: document.querySelector("#addCaptureForm"),
   addCaptureInput: document.querySelector("#addCaptureInput"),
   templateGrid: document.querySelector("#templateGrid"),
-  dailyLaunchPanel: document.querySelector("#dailyLaunchPanel"),
-  dailyShutdownPanel: document.querySelector("#dailyShutdownPanel"),
   recommendationPanel: document.querySelector("#recommendationPanel"),
   refreshNowButton: document.querySelector("#refreshNowButton"),
   backupToolsButton: document.querySelector("#backupToolsButton"),
@@ -393,12 +369,6 @@ const els = {
   focusSnoozeButton: document.querySelector("#focusSnoozeButton"),
   focusNotifyButton: document.querySelector("#focusNotifyButton"),
   closeFocusButton: document.querySelector("#closeFocusButton"),
-  planDialog: document.querySelector("#planDialog"),
-  planModeLabel: document.querySelector("#planModeLabel"),
-  planList: document.querySelector("#planList"),
-  closePlanButton: document.querySelector("#closePlanButton"),
-  clearPlanButton: document.querySelector("#clearPlanButton"),
-  savePlanButton: document.querySelector("#savePlanButton"),
   deleteItemButton: document.querySelector("#deleteItemButton"),
   saveEditButton: document.querySelector("#saveEditButton"),
   stuckDialog: document.querySelector("#stuckDialog"),
@@ -1542,7 +1512,7 @@ function buildWizardItem() {
     status,
     due: wizard.mode === "rhythm" ? "" : wizard.data.due,
     review: wizard.mode === "rhythm" ? "" : wizard.data.review || (status === "waiting" ? dateOffset(2) : ""),
-    plannedFor: todayIso(),
+    plannedFor: "",
     cadence: wizard.mode === "rhythm" ? wizard.data.cadence : "",
     trigger: wizard.mode === "rhythm" ? wizard.data.trigger.trim() : "",
     minimum: wizard.mode === "rhythm" ? minimum : "",
@@ -1790,10 +1760,6 @@ function nextCardMeta(item, reason = "") {
   return parts.slice(0, 3).join(" / ");
 }
 
-function isCreatedToday(item) {
-  return String(item.createdAt || "").startsWith(todayIso());
-}
-
 function isPlannedToday(item) {
   return item.plannedFor === todayIso();
 }
@@ -1808,7 +1774,6 @@ function todayCandidateReason(item) {
   if (isPlannedToday(item)) return "planned today";
   if (isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "rhythm overdue" : "rhythm due";
   if (!isRhythm(item) && dueDays !== null && dueDays <= 0) return dueDays < 0 ? "overdue" : "due today";
-  if (isCreatedToday(item)) return "captured today";
   if (reviewDays !== null && reviewDays <= 0 && item.waitingFor.trim()) return "waiting checkback";
   if (reviewDays !== null && reviewDays <= 0) return "review due";
   if (window.include) return window.state === "missed" ? `${window.label} passed` : window.label;
@@ -1833,7 +1798,6 @@ function todayQueueScore(item) {
   if (dueDays !== null && dueDays <= 0) score += dueDays < 0 ? 80 : 55;
   if (reviewDays !== null && reviewDays <= 0) score += item.waitingFor.trim() ? 45 : 25;
   if (isPlannedToday(item)) score += 72;
-  if (isCreatedToday(item)) score += 18;
   if (window.state === "current") score += 24;
   if (window.state === "upcoming") score += 10;
   if (window.state === "missed") score += 14;
@@ -1979,303 +1943,14 @@ function createFromTemplate(template) {
     status: template.status || (template.kind === "rhythm" ? "active" : "inbox"),
     mode,
     area: template.area || (mode === "work" ? "Work" : "Unsorted"),
-    plannedFor: todayIso(),
-    review: template.kind === "rhythm" ? "" : todayIso()
+    plannedFor: "",
+    review: template.review || ""
   });
   if (mode !== dashboardMode() && DASHBOARD_MODES.some((entry) => entry.id === mode)) state.mode = mode;
   saveState();
   render();
   showView("now");
   openDetail(item.id);
-}
-
-function findOpenItem(id) {
-  const item = getItem(id);
-  return item && isOpen(item) && !isSnoozed(item) ? item : null;
-}
-
-function dailyMinimumText(item) {
-  if (!item) return "Open the Wizard and add one loose thing";
-  if (item.dread >= 4 || item.estimate > 15) return `Open "${item.title}" for 5 minutes`;
-  return currentTinyStep(item);
-}
-
-function dailyPicks() {
-  const entries = recommendedItems();
-  const anchor = findOpenItem(state.todayPlan.anchorItemId) || entries[0]?.item || null;
-  const storedBackup = findOpenItem(state.todayPlan.backupItemId);
-  const backup = storedBackup && (!anchor || storedBackup.id !== anchor.id)
-    ? storedBackup
-    : entries.find((entry) => !anchor || entry.item.id !== anchor.id)?.item || null;
-
-  return {
-    anchor,
-    backup,
-    minimumText: state.todayPlan.minimumText || dailyMinimumText(anchor)
-  };
-}
-
-function markRecurringDone(title) {
-  const item = state.items.find((entry) => isRhythm(entry) && entry.title.toLowerCase() === title.toLowerCase());
-  if (item) markRhythmDone(item);
-}
-
-function promoteItemToNow(item) {
-  if (!item) return;
-  const now = new Date().toISOString();
-  item.status = "now";
-  item.snoozedUntil = "";
-  item.updatedAt = now;
-  item.lastTouched = now;
-}
-
-function startDailyLaunch() {
-  const picks = dailyPicks();
-  state.todayPlan = {
-    ...createDailyPlan(),
-    launchedAt: new Date().toISOString(),
-    anchorItemId: picks.anchor?.id || "",
-    backupItemId: picks.backup?.id || "",
-    minimumText: picks.minimumText
-  };
-  markRecurringDone("Daily launch");
-  promoteItemToNow(picks.anchor);
-  saveState();
-  render();
-}
-
-function replanDailyLaunch() {
-  const entries = recommendedItems();
-  const anchor = entries[0]?.item || null;
-  const backup = entries.find((entry) => !anchor || entry.item.id !== anchor.id)?.item || null;
-  state.todayPlan = {
-    ...normalizeDailyPlan(state.todayPlan),
-    anchorItemId: anchor?.id || "",
-    backupItemId: backup?.id || "",
-    minimumText: dailyMinimumText(anchor),
-    shutdownAt: ""
-  };
-  promoteItemToNow(anchor);
-  saveState();
-  render();
-}
-
-function useBackupAsAnchor() {
-  const backup = findOpenItem(state.todayPlan.backupItemId);
-  if (!backup) {
-    replanDailyLaunch();
-    return;
-  }
-  const nextBackup = recommendedItems().find((entry) => entry.item.id !== backup.id)?.item || null;
-  state.todayPlan = {
-    ...normalizeDailyPlan(state.todayPlan),
-    anchorItemId: backup.id,
-    backupItemId: nextBackup?.id || "",
-    minimumText: dailyMinimumText(backup),
-    shutdownAt: ""
-  };
-  promoteItemToNow(backup);
-  saveState();
-  render();
-}
-
-function clearDailyLaunch() {
-  state.todayPlan = createDailyPlan();
-  saveState();
-  render();
-}
-
-function closeDailyShutdown() {
-  state.todayPlan = {
-    ...normalizeDailyPlan(state.todayPlan),
-    shutdownAt: new Date().toISOString()
-  };
-  state.lastReviewed = new Date().toISOString();
-  markRecurringDone("Shutdown");
-  saveState();
-  render();
-}
-
-function reopenDailyShutdown() {
-  state.todayPlan = {
-    ...normalizeDailyPlan(state.todayPlan),
-    shutdownAt: ""
-  };
-  saveState();
-  render();
-}
-
-function touchedTodayItems() {
-  const today = todayIso();
-  return sortedItems(state.items.filter((item) => {
-    if (!isOpen(item) || !isUserVisibleItem(item)) return false;
-    return [item.lastTouched, item.updatedAt].some((value) => String(value || "").startsWith(today));
-  })).slice(0, 3);
-}
-
-function dailyPickRow(label, item, fallback) {
-  const row = document.createElement("div");
-  row.className = "daily-pick-row";
-  const tag = document.createElement("span");
-  tag.className = "daily-pick-label";
-  tag.textContent = label;
-  const title = document.createElement("strong");
-  title.className = "daily-pick-title";
-  title.textContent = item ? item.title : fallback;
-  const detail = document.createElement("p");
-  detail.textContent = item ? currentTinyStep(item) : "Nothing active is asking for attention yet.";
-  row.append(tag, title, detail);
-  return row;
-}
-
-function renderDailyLoop() {
-  if (!els.dailyLaunchPanel || !els.dailyShutdownPanel) return;
-  renderDailyLaunch();
-  renderDailyShutdown();
-}
-
-function renderDailyLaunch() {
-  const picks = dailyPicks();
-  const launched = Boolean(state.todayPlan.launchedAt);
-  const card = document.createElement("article");
-  card.className = `daily-card launch-card${launched ? " is-active" : ""}`;
-
-  const header = document.createElement("div");
-  header.className = "daily-card-header";
-  const copy = document.createElement("div");
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "eyebrow";
-  eyebrow.textContent = "Daily launch";
-  const title = document.createElement("h2");
-  title.textContent = launched ? "Today has a shape" : "Pick today's shape";
-  copy.append(eyebrow, title);
-  const badge = document.createElement("span");
-  badge.className = "count-badge";
-  badge.textContent = launched ? "ok" : "go";
-  header.append(copy, badge);
-
-  const lead = document.createElement("p");
-  lead.className = "soft-copy";
-  lead.textContent = launched
-    ? `Launched ${formatDateTime(state.todayPlan.launchedAt)}.`
-    : "Choose one anchor, one backup, and one minimum viable day.";
-
-  const pickList = document.createElement("div");
-  pickList.className = "daily-picks";
-  pickList.append(
-    dailyPickRow("Anchor", picks.anchor, "No anchor yet"),
-    dailyPickRow("Backup", picks.backup, "No backup yet"),
-    dailyPickRow("Minimum viable day", null, picks.minimumText)
-  );
-  pickList.lastElementChild.querySelector("p").textContent = "This counts if the day gets weird.";
-
-  const actions = document.createElement("div");
-  actions.className = "daily-actions";
-  if (!launched) {
-    actions.append(
-      createButton("Start day", "primary-button", startDailyLaunch),
-      createButton("Wizard", "secondary-button", () => showView("wizard"))
-    );
-  } else {
-    if (picks.anchor) actions.append(createButton("Anchor done", "primary-button", () => completeCurrentStep(picks.anchor.id)));
-    if (picks.backup) actions.append(createButton("Use backup", "secondary-button", useBackupAsAnchor));
-    actions.append(
-      createButton("Plan again", "secondary-button", replanDailyLaunch),
-      createButton("Clear", "ghost-button", clearDailyLaunch)
-    );
-  }
-
-  card.append(header, lead, pickList, actions);
-  els.dailyLaunchPanel.replaceChildren(card);
-}
-
-function renderDailyShutdown() {
-  const launched = Boolean(state.todayPlan.launchedAt);
-  const closed = Boolean(state.todayPlan.shutdownAt);
-  const card = document.createElement("article");
-  card.className = `daily-card shutdown-card${closed ? " is-closed" : ""}`;
-
-  const header = document.createElement("div");
-  header.className = "daily-card-header";
-  const copy = document.createElement("div");
-  const eyebrow = document.createElement("p");
-  eyebrow.className = "eyebrow";
-  eyebrow.textContent = "Shutdown";
-  const title = document.createElement("h2");
-  title.textContent = closed ? "Day is closed" : "Close the loops";
-  copy.append(eyebrow, title);
-  const badge = document.createElement("span");
-  badge.className = "count-badge";
-  badge.textContent = closed ? "ok" : "end";
-  header.append(copy, badge);
-
-  const counts = document.createElement("div");
-  counts.className = "daily-metrics";
-  counts.append(
-    makeChip(`${reviewItems().length} review`),
-    makeChip(`${state.items.filter((item) => item.status === "red" && isOpen(item) && isUserVisibleItem(item)).length} red`),
-    makeChip(`${state.items.filter((item) => item.status === "waiting" && isOpen(item) && isUserVisibleItem(item)).length} waiting`)
-  );
-
-  const touched = touchedTodayItems();
-  const touchedList = document.createElement("div");
-  touchedList.className = "daily-touched";
-  const touchedLabel = document.createElement("span");
-  touchedLabel.className = "daily-pick-label";
-  touchedLabel.textContent = "Touched today";
-  touchedList.append(touchedLabel);
-  if (touched.length) {
-    touched.forEach((item) => {
-      const line = document.createElement("p");
-      line.textContent = `${item.title} / ${currentTinyStep(item)}`;
-      touchedList.append(line);
-    });
-  } else {
-    const empty = document.createElement("p");
-    empty.textContent = "Nothing touched yet.";
-    touchedList.append(empty);
-  }
-
-  const label = document.createElement("label");
-  label.className = "daily-note";
-  label.textContent = "What changed?";
-  const textarea = document.createElement("textarea");
-  textarea.rows = 3;
-  textarea.placeholder = "Done, blocked, scary, waiting, or tomorrow";
-  textarea.value = state.todayPlan.shutdownNote || "";
-  textarea.addEventListener("input", () => {
-    state.todayPlan.shutdownNote = textarea.value;
-    saveState();
-  });
-  label.append(textarea);
-
-  const actions = document.createElement("div");
-  actions.className = "daily-actions";
-  if (!launched) {
-    const copy = document.createElement("p");
-    copy.className = "soft-copy";
-    copy.textContent = "Start the daily launch first; shutdown becomes useful after the day has an anchor.";
-    actions.append(createButton("Start day", "primary-button", startDailyLaunch));
-    card.append(header, copy, actions);
-    els.dailyShutdownPanel.replaceChildren(card);
-    return;
-  }
-
-  if (closed) {
-    const closedCopy = document.createElement("p");
-    closedCopy.className = "soft-copy";
-    closedCopy.textContent = `Closed ${formatDateTime(state.todayPlan.shutdownAt)}.`;
-    actions.append(createButton("Reopen", "secondary-button", reopenDailyShutdown));
-    card.append(header, closedCopy, counts, touchedList, label, actions);
-  } else {
-    actions.append(
-      createButton("Close today", "primary-button", closeDailyShutdown),
-      createButton("Review", "secondary-button", () => showView("review"))
-    );
-    card.append(header, counts, touchedList, label, actions);
-  }
-
-  els.dailyShutdownPanel.replaceChildren(card);
 }
 
 function renderRecommendation() {
@@ -2395,71 +2070,6 @@ function makeTodayQueueRow(entry, index) {
 
   row.append(rank, copy, meta);
   return row;
-}
-
-function planCandidates() {
-  return sortedItems(state.items.filter((item) => {
-    if (!isOpen(item) || isSnoozed(item) || !isUserVisibleItem(item) || !itemMatchesMode(item)) return false;
-    if (isPlannedToday(item)) return true;
-    if (todayCandidateReason(item)) return true;
-    return item.status === "inbox" || item.status === "active" || item.status === "waiting";
-  })).slice(0, 18);
-}
-
-function openPlanToday() {
-  renderPlanToday();
-  if (!els.planDialog.open) els.planDialog.showModal();
-}
-
-function renderPlanToday() {
-  if (!els.planList) return;
-  els.planModeLabel.textContent = `${modeMeta().label} mode`;
-  els.planList.replaceChildren();
-  const items = planCandidates();
-  if (!items.length) {
-    els.planList.append(makeEmpty("Nothing available to plan in this mode"));
-    return;
-  }
-
-  items.forEach((item) => {
-    const label = document.createElement("label");
-    label.className = `plan-row status-${item.status}`;
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = isPlannedToday(item);
-    checkbox.addEventListener("change", () => {
-      item.plannedFor = checkbox.checked ? todayIso() : "";
-      item.updatedAt = new Date().toISOString();
-      saveState();
-      renderRecommendation();
-      renderPlanToday();
-    });
-
-    const copy = document.createElement("span");
-    copy.className = "plan-copy";
-    const title = document.createElement("strong");
-    title.textContent = item.title;
-    const detail = document.createElement("span");
-    detail.textContent = currentTinyStep(item);
-    copy.append(title, detail);
-
-    const meta = document.createElement("small");
-    meta.textContent = [todayCandidateReason(item) || "available", formatTimeWindow(item), statusLabel(item.status)].join(" / ");
-    label.append(checkbox, copy, meta);
-    els.planList.append(label);
-  });
-}
-
-function clearTodayPlanItems() {
-  state.items.forEach((item) => {
-    if (itemMatchesMode(item) && item.plannedFor === todayIso()) {
-      item.plannedFor = "";
-      item.updatedAt = new Date().toISOString();
-    }
-  });
-  saveState();
-  render();
-  renderPlanToday();
 }
 
 function makeMiniItem(item) {
@@ -2917,8 +2527,8 @@ function captureLooseThing(title) {
     status: "inbox",
     area: dashboardMode() === "work" ? "Work" : "Unsorted",
     mode: dashboardMode(),
-    plannedFor: todayIso(),
-    review: todayIso()
+    plannedFor: "",
+    review: ""
   });
 }
 
@@ -3438,7 +3048,6 @@ function bindEvents() {
   els.wizardSkipButton.addEventListener("click", wizardSkip);
   els.wizardNextButton.addEventListener("click", wizardNext);
   els.refreshNowButton.addEventListener("click", render);
-  els.planTodayButton.addEventListener("click", openPlanToday);
 
   els.modeButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -3502,12 +3111,6 @@ function bindEvents() {
   els.focusAddFiveButton.addEventListener("click", () => extendFocusSession(5));
   els.focusSnoozeButton.addEventListener("click", snoozeFocusSession);
   els.focusNotifyButton.addEventListener("click", enableFocusAlert);
-  els.closePlanButton.addEventListener("click", () => els.planDialog.close());
-  els.savePlanButton.addEventListener("click", () => {
-    els.planDialog.close();
-    showView("now");
-  });
-  els.clearPlanButton.addEventListener("click", clearTodayPlanItems);
   els.editForm.addEventListener("submit", saveEdit);
   els.editStepAddButton.addEventListener("click", () => {
     const id = els.editItemId.value;
@@ -3539,7 +3142,6 @@ function render() {
   renderWizard();
   showAddMode();
   renderTemplates();
-  renderDailyLoop();
   renderRecommendation();
   renderRhythmsDue();
   renderAreaFilter();
