@@ -881,6 +881,18 @@ textarea {
   box-shadow: 0 14px 32px rgba(196, 137, 4, 0.18);
 }
 
+.now-card.is-doing .next-band {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent 52%),
+    linear-gradient(90deg, var(--green), var(--teal));
+}
+
+.now-card.is-doing .next-icon {
+  color: var(--green);
+  background: var(--green-soft);
+  box-shadow: 0 14px 32px rgba(7, 141, 99, 0.18);
+}
+
 .now-card.status-done,
 .item-card.status-done {
   opacity: 0.78;
@@ -1816,12 +1828,13 @@ dialog::backdrop {
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  min-height: 48px;
-  padding: 10px 12px;
+  min-height: 54px;
+  padding: 11px 14px;
   border: 1px solid #bed7cd;
-  border-radius: var(--radius);
-  background: var(--teal-soft);
-  color: var(--teal);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--green-soft) 72%, #fff), #fff);
+  color: var(--green);
   text-align: left;
 }
 
