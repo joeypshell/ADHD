@@ -111,8 +111,9 @@
           </div>
           <section class="empty-wizard-prompt" id="emptyWizardPrompt" hidden>
             <p class="eyebrow">Nothing active</p>
-            <h3>Looks like you have nothing active yet.</h3>
-            <p>Add one project or rhythm and I will turn it into the next small step.</p>
+            <h3>Start with three life rails.</h3>
+            <p>Add a few recurring anchors now. After that, Today will generate the list automatically.</p>
+            <div class="life-rail-starter" id="lifeRailStarter"></div>
           </section>
           <section class="add-chooser" aria-label="Add choices">
             <button class="add-choice is-selected" type="button" data-add-mode="capture">
@@ -442,6 +443,14 @@
           <label class="span-full">
             Minimum version
             <input id="editMinimum" placeholder="Smallest useful version">
+          </label>
+          <label class="span-full">
+            Good version
+            <input id="editRhythmGood" placeholder="Useful middle version">
+          </label>
+          <label class="span-full">
+            Full reset
+            <input id="editRhythmFull" placeholder="Complete version when you have capacity">
           </label>
           <label class="span-full">
             Tiny start

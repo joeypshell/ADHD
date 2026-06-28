@@ -572,6 +572,51 @@ textarea {
   line-height: 1.4;
 }
 
+.life-rail-starter {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.life-rail-button {
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  padding: 11px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--green-soft) 22%, #fff);
+  border: 1px solid color-mix(in srgb, var(--green) 16%, var(--line));
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.life-rail-button.primary {
+  color: #fff;
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+.life-rail-button.is-added {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green-soft) 45%, #fff);
+}
+
+.life-rail-button strong {
+  font-size: 0.98rem;
+  line-height: 1.12;
+}
+
+.life-rail-button span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.22;
+}
+
+.life-rail-button.primary span {
+  color: rgba(255, 255, 255, 0.84);
+}
+
 .view.is-empty > .section-heading {
   display: none;
 }
@@ -733,6 +778,37 @@ textarea {
 .template-card small {
   align-self: end;
   font-weight: 850;
+}
+
+.rhythm-ladder {
+  display: grid;
+  gap: 6px;
+}
+
+.rhythm-ladder p {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.rhythm-ladder span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.rhythm-ladder strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+  line-height: 1.2;
 }
 
 .daily-loop {
@@ -2434,6 +2510,10 @@ dialog::backdrop {
   }
 
   .add-chooser {
+    grid-template-columns: 1fr;
+  }
+
+  .life-rail-starter {
     grid-template-columns: 1fr;
   }
 

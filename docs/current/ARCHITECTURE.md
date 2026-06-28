@@ -60,6 +60,7 @@ Important item fields:
 - `exactTime`: optional `HH:mm`
 - `status`: `inbox`, `red`, `now`, `active`, `waiting`, `later`, `paused`, or `done`
 - `steps`
+- `minimum`, `rhythmGood`, and `rhythmFull` for recurring rhythm ladders
 - `importance`
 - `dread`
 - `snoozeCount`
@@ -70,6 +71,12 @@ Important item fields:
 The Today dashboard is automatic. It does not depend on launching or planning a day.
 
 Rhythms act as virtual generated tasks for the current day. A rhythm appears on Today when its cadence says it is due or overdue, then its time window changes priority and bucket placement. Completing a rhythm records `lastDone`, advances `nextDue`, and keeps a completed-today row visible on the dashboard for the rest of the day.
+
+Rhythms can carry a three-level action ladder:
+
+- minimum: the smallest version that can count on a hard day
+- good: a useful middle version
+- full: the complete reset when capacity is available
 
 Items enter Today when they are:
 
@@ -125,6 +132,7 @@ Add:
 - quick capture
 - rule-based brain-dump triage
 - templates
+- first-run life rail starter for Body, House, and Work anchors
 - wizard for project, rhythm, or rescue
 
 Lists:

@@ -107,6 +107,22 @@ const STARTER_TEMPLATES = [
     steps: ["Put on workout clothes", "Start the warmup", "Do the written plan"]
   },
   {
+    id: "work-checkin",
+    title: "Check work queue",
+    description: "Find the one work item that matters next",
+    kind: "rhythm",
+    area: "Work",
+    mode: "work",
+    cadence: "daily",
+    timeWindow: "morning",
+    estimate: 10,
+    importance: 5,
+    dread: 2,
+    nextAction: "Open the work queue",
+    minimum: "Open the work queue",
+    steps: ["Open the work queue", "Pick the one visible next action", "Send or save one update"]
+  },
+  {
     id: "gas",
     title: "Get gas",
     description: "Keep the car ready",
@@ -182,6 +198,12 @@ const STARTER_TEMPLATES = [
   }
 ];
 
+const LIFE_RAIL_STARTERS = [
+  { id: "body", label: "Body", templateIds: ["workout"] },
+  { id: "house", label: "House", templateIds: ["dishes"] },
+  { id: "work", label: "Work", templateIds: ["work-checkin"] }
+];
+
 const DEFAULT_RHYTHMS = [];
 
 const STARTER_RHYTHM_TITLES = new Set([
@@ -193,7 +215,7 @@ const STARTER_RHYTHM_TITLES = new Set([
 ]);
 
 const DEFAULT_DATA = {
-  version: 7,
+  version: 8,
   createdAt: new Date().toISOString(),
   lastReviewed: "",
   lastBackupAt: "",
@@ -217,7 +239,7 @@ const WIZARD_MODES = {
   rhythm: {
     label: "Rhythm",
     description: "A recurring life rail that needs to come back forever.",
-    steps: ["mode", "title", "context", "area", "cadence", "window", "tiny", "summary"],
+    steps: ["mode", "title", "context", "area", "cadence", "ladder", "window", "summary"],
     defaults: { kind: "rhythm", status: "active", importance: 4, dread: 2, estimate: 5, cadence: "weekly" }
   },
   rescue: {
@@ -315,6 +337,7 @@ const els = {
   wizardView: document.querySelector("#wizardView"),
   resetWizardButton: document.querySelector("#resetWizardButton"),
   emptyWizardPrompt: document.querySelector("#emptyWizardPrompt"),
+  lifeRailStarter: document.querySelector("#lifeRailStarter"),
   wizardModeLabel: document.querySelector("#wizardModeLabel"),
   wizardStepTitle: document.querySelector("#wizardStepTitle"),
   wizardStepCount: document.querySelector("#wizardStepCount"),
@@ -363,6 +386,8 @@ const els = {
   editNextDue: document.querySelector("#editNextDue"),
   editTrigger: document.querySelector("#editTrigger"),
   editMinimum: document.querySelector("#editMinimum"),
+  editRhythmGood: document.querySelector("#editRhythmGood"),
+  editRhythmFull: document.querySelector("#editRhythmFull"),
   editNextAction: document.querySelector("#editNextAction"),
   editConsequence: document.querySelector("#editConsequence"),
   editNotes: document.querySelector("#editNotes"),
@@ -515,6 +540,8 @@ function nextRhythmDue(lastDone, cadence) {
 
 function createRhythmItem(input = {}) {
   const minimum = input.minimum || input.nextAction || "Do the minimum version";
+  const rhythmGood = input.rhythmGood || input.goodVersion || "";
+  const rhythmFull = input.rhythmFull || input.fullVersion || "";
   const cadence = normalizeCadence(input.cadence || "weekly");
   const lastDone = input.lastDone || "";
   const title = String(input.title || "Recurring rhythm").trim();
@@ -533,6 +560,8 @@ function createRhythmItem(input = {}) {
     cadence,
     trigger: input.trigger || "",
     minimum,
+    rhythmGood,
+    rhythmFull,
     lastDone,
     nextDue: input.nextDue || nextRhythmDue(lastDone, cadence),
     consequence: input.consequence || "Recurring life rail",
@@ -544,13 +573,14 @@ function createRhythmItem(input = {}) {
     notes: input.notes || "",
     system: Boolean(input.system),
     starter: Boolean(input.starter),
+    starterTemplateId: input.starterTemplateId || "",
     createdAt: input.createdAt || new Date().toISOString(),
     updatedAt: input.updatedAt || new Date().toISOString(),
     lastTouched: input.lastTouched || input.updatedAt || input.createdAt || "",
     completedAt: input.completedAt || "",
     snoozedUntil: input.snoozedUntil || "",
     snoozeCount: Number(input.snoozeCount || 0),
-    steps: normalizeSteps(input.steps || [minimum], minimum)
+    steps: normalizeRhythmSteps(input.steps, minimum, rhythmGood, rhythmFull)
   };
 }
 
@@ -692,7 +722,7 @@ function normalizeData(data) {
   const normalized = {
     ...cloneData(DEFAULT_DATA),
     ...data,
-    version: 7,
+    version: 8,
     lastBackupAt: data.lastBackupAt || "",
     mode: DASHBOARD_MODES.some((mode) => mode.id === data.mode) ? data.mode : "home",
     filter: { area: "all", status: "", kind: "", ...(data.filter || {}) },
@@ -733,6 +763,8 @@ function normalizeItem(item) {
     cadence: "",
     trigger: "",
     minimum: "",
+    rhythmGood: "",
+    rhythmFull: "",
     lastDone: "",
     nextDue: "",
     consequence: item.consequence || "",
@@ -743,6 +775,7 @@ function normalizeItem(item) {
     waitingFor: item.waitingFor || "",
     notes: item.notes || "",
     system: Boolean(item.system),
+    starterTemplateId: item.starterTemplateId || "",
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || new Date().toISOString(),
     lastTouched: item.lastTouched || item.updatedAt || item.createdAt || "",
@@ -755,6 +788,9 @@ function normalizeItem(item) {
 
 function normalizeRhythmItem(item) {
   const minimum = item.minimum || item.nextAction || "Do the minimum version";
+  const sourceSteps = normalizeStepObjects(item.steps);
+  const rhythmGood = item.rhythmGood || sourceSteps.find((step) => step.text !== minimum)?.text || "";
+  const rhythmFull = item.rhythmFull || sourceSteps.find((step) => step.text !== minimum && step.text !== rhythmGood)?.text || "";
   const cadence = normalizeCadence(item.cadence || "weekly");
   const lastDone = item.lastDone || "";
   const title = String(item.title || "Recurring rhythm").trim();
@@ -763,7 +799,7 @@ function normalizeRhythmItem(item) {
     && !item.notes
     && !item.waitingFor
     && !item.snoozeCount;
-  const steps = normalizeStepObjects(item.steps);
+  const steps = normalizeRhythmSteps(item.steps, minimum, rhythmGood, rhythmFull);
   if (!steps.length) steps.push({ id: cryptoId(), text: minimum, done: false });
 
   return {
@@ -781,6 +817,8 @@ function normalizeRhythmItem(item) {
     cadence,
     trigger: item.trigger || "",
     minimum,
+    rhythmGood,
+    rhythmFull,
     lastDone,
     nextDue: item.nextDue || nextRhythmDue(lastDone, cadence),
     consequence: item.consequence || "Recurring life rail",
@@ -792,6 +830,7 @@ function normalizeRhythmItem(item) {
     notes: item.notes || "",
     system: Boolean(item.system),
     starter: Boolean(item.starter) || untouchedStarter,
+    starterTemplateId: item.starterTemplateId || "",
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || new Date().toISOString(),
     lastTouched: item.lastTouched || item.updatedAt || item.createdAt || "",
@@ -945,6 +984,8 @@ function addItem(input) {
       cadence: input.cadence || "",
       trigger: input.trigger || "",
       minimum: input.minimum || "",
+      rhythmGood: input.rhythmGood || "",
+      rhythmFull: input.rhythmFull || "",
       lastDone: input.lastDone || "",
       nextDue: input.nextDue || "",
       consequence: input.consequence || "",
@@ -955,6 +996,7 @@ function addItem(input) {
       waitingFor: input.waitingFor || "",
       notes: input.notes || "",
       system: Boolean(input.system),
+      starterTemplateId: input.starterTemplateId || "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       lastTouched: "",
@@ -976,6 +1018,23 @@ function normalizeSteps(steps, nextAction) {
   return parsed.map((text) => ({ id: cryptoId(), text, done: false }));
 }
 
+function normalizeRhythmSteps(steps, minimum, rhythmGood = "", rhythmFull = "") {
+  const labels = [
+    minimum,
+    rhythmGood,
+    rhythmFull
+  ].map((text) => String(text || "").trim()).filter(Boolean);
+  const source = Array.isArray(steps) && steps.length ? steps : labels;
+  const normalized = normalizeStepObjects(source);
+  labels.forEach((label) => {
+    if (!normalized.some((step) => step.text.toLowerCase() === label.toLowerCase())) {
+      normalized.push({ id: cryptoId(), text: label, done: false });
+    }
+  });
+  if (!normalized.length && minimum) normalized.push({ id: cryptoId(), text: minimum, done: false });
+  return normalized;
+}
+
 function createWizardState(mode) {
   const safeMode = WIZARD_MODES[mode] ? mode : "project";
   const meta = WIZARD_MODES[safeMode];
@@ -995,6 +1054,8 @@ function createWizardState(mode) {
       cadence: meta.defaults.cadence || "weekly",
       trigger: "",
       minimum: "",
+      rhythmGood: "",
+      rhythmFull: "",
       consequenceTags: [],
       customConsequence: "",
       fear: "",
@@ -1041,6 +1102,7 @@ function wizardStepTitle(step) {
     context: "Home, work, or both?",
     area: "Where does it belong?",
     cadence: "How often does it repeat?",
+    ladder: "Choose the versions",
     timing: "When does it matter?",
     window: "When should this show up?",
     consequence: "Why does it matter?",
@@ -1084,6 +1146,7 @@ function renderWizardStep(step) {
   if (step === "context") return renderWizardContext();
   if (step === "area") return renderWizardArea();
   if (step === "cadence") return renderWizardCadence();
+  if (step === "ladder") return renderWizardLadder();
   if (step === "timing") return renderWizardTiming();
   if (step === "window") return renderWizardWindow();
   if (step === "consequence") return renderWizardConsequence();
@@ -1202,19 +1265,45 @@ function renderWizardCadence() {
   });
   triggerLabel.append(triggerInput);
 
-  const minimumLabel = document.createElement("label");
-  minimumLabel.className = "wizard-field";
-  minimumLabel.textContent = "Minimum version";
-  const minimumInput = document.createElement("input");
-  minimumInput.value = wizard.data.minimum;
-  minimumInput.placeholder = "Example: clear one surface for 5 minutes";
-  minimumInput.addEventListener("input", () => {
-    wizard.data.minimum = minimumInput.value;
-    if (!wizard.data.nextAction.trim()) wizard.data.nextAction = minimumInput.value;
-  });
-  minimumLabel.append(minimumInput);
+  panel.append(triggerLabel);
+  return panel;
+}
 
-  panel.append(triggerLabel, minimumLabel);
+function renderWizardLadder() {
+  const panel = wizardPanel("Give this rhythm a ladder. Low-energy days can still count.");
+  const fields = [
+    {
+      key: "minimum",
+      label: "Bare minimum",
+      placeholder: "Example: clear one sink or put on workout clothes"
+    },
+    {
+      key: "rhythmGood",
+      label: "Good version",
+      placeholder: "Example: load dishes or do the warmup"
+    },
+    {
+      key: "rhythmFull",
+      label: "Full reset",
+      placeholder: "Example: reset kitchen or finish the written workout"
+    }
+  ];
+
+  fields.forEach((field) => {
+    const label = document.createElement("label");
+    label.className = "wizard-field";
+    label.textContent = field.label;
+    const input = document.createElement("input");
+    input.value = wizard.data[field.key] || "";
+    input.placeholder = field.placeholder;
+    input.addEventListener("input", () => {
+      wizard.data[field.key] = input.value;
+      if (field.key === "minimum") wizard.data.nextAction = input.value;
+    });
+    label.append(input);
+    panel.append(label);
+  });
+
   return panel;
 }
 
@@ -1457,10 +1546,28 @@ function renderWizardSummary() {
   const tiny = document.createElement("div");
   tiny.className = "tiny-start";
   const tinyLabel = document.createElement("span");
-  tinyLabel.textContent = "Tiny start";
+  tinyLabel.textContent = item.kind === "rhythm" ? "Bare minimum" : "Tiny start";
   const tinyText = document.createElement("strong");
   tinyText.textContent = item.nextAction || firstOpenStep(item.steps) || "Open this for 5 minutes";
   tiny.append(tinyLabel, tinyText);
+
+  const ladder = document.createElement("div");
+  ladder.className = "rhythm-ladder";
+  if (item.kind === "rhythm") {
+    [
+      ["Minimum", item.minimum],
+      ["Good", item.rhythmGood],
+      ["Full", item.rhythmFull]
+    ].filter((entry) => entry[1]).forEach(([label, value]) => {
+      const row = document.createElement("p");
+      const key = document.createElement("span");
+      key.textContent = label;
+      const text = document.createElement("strong");
+      text.textContent = value;
+      row.append(key, text);
+      ladder.append(row);
+    });
+  }
 
   const steps = document.createElement("ul");
   steps.className = "wizard-summary-steps";
@@ -1470,7 +1577,10 @@ function renderWizardSummary() {
     steps.append(li);
   });
 
-  card.append(meta, title, tiny, steps);
+  card.append(meta, title);
+  if (ladder.childElementCount) card.append(ladder);
+  else card.append(tiny);
+  card.append(steps);
   panel.append(card);
   return panel;
 }
@@ -1537,6 +1647,10 @@ function applyWizardDefault(step, skipped = false) {
   if (step === "cadence" && !wizard.data.minimum.trim()) {
     wizard.data.minimum = STEP_SUGGESTIONS.rhythm[0];
   }
+  if (step === "ladder") {
+    if (!wizard.data.minimum.trim()) wizard.data.minimum = wizard.data.nextAction.trim() || STEP_SUGGESTIONS.rhythm[0];
+    if (!wizard.data.nextAction.trim()) wizard.data.nextAction = wizard.data.minimum;
+  }
   if (step === "tiny" && !wizard.data.nextAction.trim()) {
     wizard.data.nextAction = STEP_SUGGESTIONS[wizard.mode][0];
   }
@@ -1561,8 +1675,10 @@ function buildWizardItem() {
 
   const nextAction = wizard.data.nextAction.trim() || STEP_SUGGESTIONS[wizard.mode][0];
   const minimum = wizard.data.minimum.trim() || nextAction;
+  const rhythmGood = wizard.data.rhythmGood.trim();
+  const rhythmFull = wizard.data.rhythmFull.trim();
   const steps = wizard.mode === "rhythm"
-    ? [minimum]
+    ? [minimum, rhythmGood, rhythmFull].filter(Boolean)
     : wizard.data.steps.length ? wizard.data.steps : [nextAction];
   let status = wizard.data.status || defaults.status;
   if (wizard.data.waitingFor.trim()) status = "waiting";
@@ -1583,6 +1699,8 @@ function buildWizardItem() {
     cadence: wizard.mode === "rhythm" ? wizard.data.cadence : "",
     trigger: wizard.mode === "rhythm" ? wizard.data.trigger.trim() : "",
     minimum: wizard.mode === "rhythm" ? minimum : "",
+    rhythmGood: wizard.mode === "rhythm" ? rhythmGood : "",
+    rhythmFull: wizard.mode === "rhythm" ? rhythmFull : "",
     nextDue: wizard.mode === "rhythm" ? nextRhythmDue("", wizard.data.cadence) : "",
     consequence: consequenceParts.join(", "),
     nextAction,
@@ -2275,6 +2393,67 @@ function renderTemplates() {
   STARTER_TEMPLATES.forEach((template) => els.templateGrid.append(makeTemplateCard(template)));
 }
 
+function templateById(id) {
+  return STARTER_TEMPLATES.find((template) => template.id === id);
+}
+
+function existingTemplateItem(template) {
+  if (!template) return null;
+  const mode = templateMode(template);
+  return state.items.find((item) => (
+    item.starterTemplateId === template.id
+    || (item.title === template.title && item.mode === mode && item.kind === template.kind)
+  ));
+}
+
+function renderLifeRailStarter() {
+  if (!els.lifeRailStarter) return;
+  els.lifeRailStarter.replaceChildren();
+
+  LIFE_RAIL_STARTERS.forEach((rail) => {
+    const templates = rail.templateIds.map(templateById).filter(Boolean);
+    const done = templates.every(existingTemplateItem);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `life-rail-button${done ? " is-added" : ""}`;
+    const title = document.createElement("strong");
+    title.textContent = rail.label;
+    const copy = document.createElement("span");
+    copy.textContent = done ? "Added" : templates.map((template) => template.title).join(", ");
+    button.append(title, copy);
+    button.addEventListener("click", () => addLifeRail(rail));
+    els.lifeRailStarter.append(button);
+  });
+
+  const addThree = document.createElement("button");
+  addThree.type = "button";
+  addThree.className = "life-rail-button primary";
+  const title = document.createElement("strong");
+  title.textContent = "Add three rails";
+  const copy = document.createElement("span");
+  copy.textContent = "Body, house, and work anchors";
+  addThree.append(title, copy);
+  addThree.addEventListener("click", () => {
+    LIFE_RAIL_STARTERS.forEach((rail) => addLifeRail(rail, { openDetail: false, targetMode: "home" }));
+  });
+  els.lifeRailStarter.append(addThree);
+}
+
+function addLifeRail(rail, options = {}) {
+  const templates = rail.templateIds.map(templateById).filter(Boolean);
+  let created = null;
+  templates.forEach((template) => {
+    if (!existingTemplateItem(template)) created = createFromTemplate(template, { openDetail: false, renderAfter: false }) || created;
+  });
+  if (options.targetMode && DASHBOARD_MODES.some((entry) => entry.id === options.targetMode)) {
+    state.mode = options.targetMode;
+  }
+  saveState();
+  render();
+  showView("now");
+  if (created && options.openDetail !== false) openDetail(created.id);
+}
+
 function makeTemplateCard(template) {
   const button = document.createElement("button");
   button.type = "button";
@@ -2294,22 +2473,39 @@ function makeTemplateCard(template) {
   return button;
 }
 
-function createFromTemplate(template) {
+function createFromTemplate(template, options = {}) {
+  const shouldOpenDetail = options.openDetail !== false;
+  const shouldRender = options.renderAfter !== false;
   const mode = templateMode(template);
+  const existing = existingTemplateItem(template);
+  if (existing) {
+    if (mode !== dashboardMode() && DASHBOARD_MODES.some((entry) => entry.id === mode)) state.mode = mode;
+    if (shouldRender) {
+      saveState();
+      render();
+      showView("now");
+      if (shouldOpenDetail) openDetail(existing.id);
+    }
+    return existing;
+  }
   const item = addItem({
     ...template,
     title: template.title,
     status: template.status || (template.kind === "rhythm" ? "active" : "inbox"),
     mode,
     area: template.area || (mode === "work" ? "Work" : "Unsorted"),
+    starterTemplateId: template.id,
     plannedFor: "",
     review: template.review || ""
   });
   if (mode !== dashboardMode() && DASHBOARD_MODES.some((entry) => entry.id === mode)) state.mode = mode;
-  saveState();
-  render();
-  showView("now");
-  openDetail(item.id);
+  if (shouldRender) {
+    saveState();
+    render();
+    showView("now");
+    if (shouldOpenDetail) openDetail(item.id);
+  }
+  return item;
 }
 
 function renderCheckin() {
@@ -3213,7 +3409,29 @@ function renderDetail(item) {
   const progressBar = document.createElement("span");
   progressBar.style.width = `${itemProgress(item)}%`;
   progress.append(progressBar);
-  summary.append(reasonRow, tiny, progress);
+  if (isRhythm(item)) {
+    const ladder = document.createElement("div");
+    ladder.className = "rhythm-ladder";
+    [
+      ["Minimum", item.minimum],
+      ["Good", item.rhythmGood],
+      ["Full", item.rhythmFull]
+    ].filter((entry) => entry[1]).forEach(([label, value]) => {
+      const row = document.createElement("p");
+      const key = document.createElement("span");
+      key.textContent = label;
+      const text = document.createElement("strong");
+      text.textContent = value;
+      row.append(key, text);
+      ladder.append(row);
+    });
+    summary.append(reasonRow);
+    if (ladder.childElementCount) summary.append(ladder);
+    else summary.append(tiny);
+    summary.append(progress);
+  } else {
+    summary.append(reasonRow, tiny, progress);
+  }
   if (isFocusItem(item)) summary.append(makeFocusPill(item));
 
   const steps = document.createElement("div");
@@ -3303,6 +3521,8 @@ function openEdit(itemId) {
   els.editNextDue.value = item.nextDue || "";
   els.editTrigger.value = item.trigger || "";
   els.editMinimum.value = item.minimum || "";
+  els.editRhythmGood.value = item.rhythmGood || "";
+  els.editRhythmFull.value = item.rhythmFull || "";
   els.editNextAction.value = item.nextAction;
   els.editConsequence.value = item.consequence;
   els.editNotes.value = item.notes;
@@ -3352,6 +3572,8 @@ function saveEdit(event) {
     lastDone: normalizeKind(els.editKind.value) === "rhythm" ? els.editLastDone.value : "",
     trigger: normalizeKind(els.editKind.value) === "rhythm" ? els.editTrigger.value.trim() : "",
     minimum: normalizeKind(els.editKind.value) === "rhythm" ? els.editMinimum.value.trim() || els.editNextAction.value.trim() : "",
+    rhythmGood: normalizeKind(els.editKind.value) === "rhythm" ? els.editRhythmGood.value.trim() : "",
+    rhythmFull: normalizeKind(els.editKind.value) === "rhythm" ? els.editRhythmFull.value.trim() : "",
     nextDue: normalizeKind(els.editKind.value) === "rhythm"
       ? els.editNextDue.value || nextRhythmDue(els.editLastDone.value || getItem(id)?.lastDone || "", els.editCadence.value)
       : "",
@@ -3878,6 +4100,7 @@ function render() {
   renderCheckin();
   renderWizard();
   showAddMode();
+  renderLifeRailStarter();
   renderBrainDumpCandidates();
   renderTemplates();
   renderRecommendation();
