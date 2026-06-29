@@ -4424,6 +4424,9 @@ body {
 }
 
 .recommendation-shell {
+  position: sticky;
+  top: max(10px, env(safe-area-inset-top));
+  z-index: 12;
   margin-bottom: 26px;
 }
 
@@ -4619,6 +4622,10 @@ body {
     width: 100%;
   }
 
+  .recommendation-shell {
+    top: max(8px, env(safe-area-inset-top));
+  }
+
   .next-band {
     min-height: 54px;
     padding: 14px 18px;
@@ -4665,6 +4672,36 @@ body {
 
   .snooze-choices {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .recommendation-shell.is-stuck .next-detail-grid,
+  .recommendation-shell.is-stuck .next-progress,
+  .recommendation-shell.is-stuck .now-actions,
+  .recommendation-shell.is-stuck .snooze-choices {
+    display: none;
+  }
+
+  .recommendation-shell.is-stuck .now-card {
+    border-radius: 20px;
+    box-shadow: 0 18px 38px rgba(19, 36, 34, 0.16);
+  }
+
+  .recommendation-shell.is-stuck .next-card-body {
+    padding: 14px 16px;
+  }
+
+  .recommendation-shell.is-stuck .next-main {
+    grid-template-columns: 44px minmax(0, 1fr);
+    min-height: 58px;
+  }
+
+  .recommendation-shell.is-stuck .next-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .recommendation-shell.is-stuck .now-card h3 {
+    font-size: 1.35rem;
   }
 
   .today-summary {

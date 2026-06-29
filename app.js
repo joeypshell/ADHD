@@ -5851,6 +5851,13 @@ function maybeOpenEmptyWizard() {
   showView("wizard");
 }
 
+function updateStickyRecommendationState() {
+  const shell = document.querySelector(".recommendation-shell");
+  if (!shell || currentView() !== "now") return;
+  const top = Number.parseFloat(getComputedStyle(shell).top) || 0;
+  shell.classList.toggle("is-stuck", window.scrollY > shell.offsetTop - top - 1);
+}
+
 function bindEvents() {
   els.todayLabel.textContent = new Intl.DateTimeFormat(undefined, {
     weekday: "long",
@@ -6014,6 +6021,8 @@ function bindEvents() {
   document.querySelectorAll("[data-stuck-action]").forEach((button) => {
     button.addEventListener("click", () => handleStuckAction(button.dataset.stuckAction));
   });
+  window.addEventListener("scroll", updateStickyRecommendationState, { passive: true });
+  window.addEventListener("resize", updateStickyRecommendationState);
 }
 
 function render() {
@@ -6038,6 +6047,7 @@ function render() {
   syncFocusTimer();
   maybeSendRhythmDueAlert();
   maybeOpenEmptyWizard();
+  requestAnimationFrame(updateStickyRecommendationState);
 }
 
 populateFormSelects();
