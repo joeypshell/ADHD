@@ -2159,7 +2159,20 @@ function activeFocusSession() {
 
 function isFocusItem(item) {
   const session = activeFocusSession();
-  return Boolean(session && item && session.itemId === item.id);
+  return Boolean(session && item && session.itemId === item.id && session.phase !== "done");
+}
+
+function isFinishedFocusSession(session = state.focusSession) {
+  if (!session) return false;
+  return session.phase === "done" || (!session.running && sessionRemainingMs(session) <= 0);
+}
+
+function clearFinishedFocusSessionForItem(itemId) {
+  if (!state.focusSession || state.focusSession.itemId !== itemId || !isFinishedFocusSession(state.focusSession)) return false;
+  state.focusSession = null;
+  saveState();
+  syncFocusTimer();
+  return true;
 }
 
 function focusDurationMinutes(item) {
@@ -3290,10 +3303,8 @@ function renderRecommendation() {
   actions.className = "now-actions";
   if (session) {
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
-  } else if (item.status === "now") {
-    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
   } else {
-    actions.append(createButton("Start", "primary-button action-button", () => startDoingItem(item.id)));
+    actions.append(createButton("Start", "primary-button action-button", () => openFocusSetup(item.id)));
   }
 
   taskRow.append(main, actions);
@@ -4752,6 +4763,7 @@ function startDoingItem(itemId) {
 function openFocusSetup(itemId) {
   const item = getItem(itemId);
   if (!item) return;
+  clearFinishedFocusSessionForItem(itemId);
   focusSetupItemId = itemId;
   if (!POMODORO_PRESETS.some((preset) => preset.id === selectedPomodoroPresetId)) selectedPomodoroPresetId = "classic";
   if (!BUILDUP_OPTIONS.some((option) => option.id === selectedBuildUpId)) selectedBuildUpId = "none";
