@@ -43,10 +43,15 @@ Run these checks after:
 
 ## Apple
 
+Before testing, complete `docs/planning/APPLE_PROVIDER_SETUP.md`.
+
 1. Press Continue with Apple.
 2. Complete the provider login.
-3. Confirm Settings shows Signed in.
-4. Press Sync now and verify the same first-sync choices.
+3. Confirm the browser returns to the configured app redirect URL.
+4. Confirm Settings shows Signed in.
+5. Press Sync now and verify the same first-sync choices.
+6. If Apple fails before showing the Apple login screen, re-check the Supabase Apple provider is enabled.
+7. If Apple signs in but does not return to the app, re-check the Apple Services ID return URL and Supabase redirect allow list.
 
 ## Second Browser Or Device
 

@@ -354,6 +354,14 @@
             <button class="secondary-button" id="syncNowButton" type="button">Sync now</button>
             <button class="ghost-button" id="syncLogoutButton" type="button">Log out</button>
           </div>
+          <details class="provider-setup-note">
+            <summary>Apple provider setup</summary>
+            <ul>
+              <li>Enable Apple in Supabase Auth providers.</li>
+              <li>Use an Apple Services ID and the Supabase callback URL.</li>
+              <li>Keep Team ID, Key ID, .p8 key, and client secret in Supabase only.</li>
+            </ul>
+          </details>
           <p class="sync-feedback" id="syncFeedback" aria-live="polite"></p>
         </section>
         <div class="backup-actions">

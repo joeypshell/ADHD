@@ -4743,7 +4743,7 @@ function syncStatusInfo() {
   return {
     badge: "Ready",
     tone: "ok",
-    status: "Supabase public config is present. Send a login link, then run manual Sync now.",
+    status: "Supabase public config is present. Apple login can work after the Apple provider is enabled in Supabase.",
     copy: "First login will ask whether to upload this browser, use the cloud copy, or stay local."
   };
 }
@@ -4998,8 +4998,24 @@ async function syncProviderLogin(provider) {
     if (error) throw error;
     setSyncFeedback(`Opening ${providerLabel} login. Return here after sign-in, then press Sync now.`, "ok");
   } catch (error) {
-    setSyncFeedback(`${providerLabel} login failed: ${error.message || "Supabase could not start provider login."}`, "warn");
+    setSyncFeedback(providerLoginErrorMessage(provider, error), "warn");
   }
+}
+
+function providerLoginErrorMessage(provider, error) {
+  const providerLabel = provider === "apple" ? "Apple" : "Google";
+  const raw = error?.message || "Supabase could not start provider login.";
+  const lower = String(raw).toLowerCase();
+  if (provider === "apple" && (
+    lower.includes("provider")
+    || lower.includes("disabled")
+    || lower.includes("unsupported")
+    || lower.includes("invalid")
+    || lower.includes("oauth")
+  )) {
+    return "Apple login is not ready in Supabase yet. Enable the Apple provider with the Services ID, Team ID, Key ID, .p8 key, generated client secret, and the Supabase callback URL.";
+  }
+  return `${providerLabel} login failed: ${raw}`;
 }
 
 async function syncLogout() {

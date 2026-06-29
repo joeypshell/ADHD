@@ -52,11 +52,16 @@ The app starts this flow with Supabase provider id `google`.
 
 ### Apple
 
+Use `docs/planning/APPLE_PROVIDER_SETUP.md` as the working checklist.
+
 1. Configure Sign in with Apple in the Apple Developer account.
-2. Create the required Service ID / web auth configuration.
-3. Add the callback URL shown in Supabase Auth provider settings to the Apple web auth configuration.
-4. Paste the Apple client id / service id and secret material required by Supabase into Supabase Auth -> Providers -> Apple.
-5. Enable the Apple provider in Supabase.
+2. Create or select an App ID with Sign in with Apple enabled.
+3. Create a Services ID for this web app.
+4. Add the Supabase callback URL to the Services ID return URLs. The callback is usually `https://<project-ref>.supabase.co/auth/v1/callback`.
+5. Create a Sign in with Apple key, record the Team ID and Key ID, and download the `.p8` key outside the repo.
+6. Generate an Apple client secret with the Team ID, Services ID, Key ID, and `.p8` key. Use a maximum 6-month lifetime and rotate it before expiration.
+7. Paste the Services ID and generated client secret into Supabase Auth -> Providers -> Apple.
+8. Enable the Apple provider in Supabase.
 
 The app starts this flow with Supabase provider id `apple`.
 

@@ -95,10 +95,10 @@ Known setup blockers:
 
 Next auth decision:
 
-1. Enable Google OAuth first for practical cross-device login.
+1. Enable Apple first because it is the current provider target.
 2. Keep email magic link as fallback, but add custom SMTP before serious repeated testing.
-3. Add Apple only after Google is working, because Apple setup has more external account requirements.
-4. Re-run the smoke test in `docs/planning/SUPABASE_SMOKE_TEST.md`.
+3. Add Google after Apple if another provider is still useful.
+4. Re-run the Apple smoke test in `docs/planning/SUPABASE_SMOKE_TEST.md`.
 
 Why one JSON document first:
 

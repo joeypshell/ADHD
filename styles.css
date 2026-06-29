@@ -1233,6 +1233,30 @@ textarea {
   background: rgba(255, 255, 255, 0.86);
 }
 
+.provider-setup-note {
+  padding: 10px 12px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.provider-setup-note summary {
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 950;
+}
+
+.provider-setup-note ul {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
 .sync-email-row {
   display: grid;
   gap: 6px;
