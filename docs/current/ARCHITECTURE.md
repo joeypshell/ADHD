@@ -112,6 +112,8 @@ The top recommendation comes from deterministic scoring in `todayQueueScore()` o
 
 The Today recommendation intentionally excludes completed-today items. The Today queue uses `todayDashboardEntries()` so it can show the whole day grouped as Now / Next / Later / Missed / Done.
 
+The Today summary strip reuses the same bucket logic to show remaining work, due count, rhythm count, missed count, and done count without requiring a manual daily plan.
+
 The optional daily check-in can adjust scoring for the current day:
 
 - energy: low, medium, high
@@ -139,6 +141,7 @@ Today:
 - compact optional energy/brain-state check-in
 - sticky focus anchor when a Doing timer is active
 - recommendation card
+- compact summary strip for remaining / now / missed-or-later / done
 - compact visual timeline: Now / Next / Later / Missed / Done
 - complete Today list with direct Doing, Done, and same-day Undo actions
 - quick capture with browser voice fill-in and a tiny-start follow-up
@@ -232,6 +235,7 @@ Key render functions:
 - `renderRecommendation()`
 - `renderFocusAnchor()`
 - `renderCheckin()`
+- `renderTodaySummary()`
 - `renderTodayTimeline()`
 - `renderBrainDumpCandidates()`
 - `renderRhythmsDue()`

@@ -311,6 +311,7 @@ const els = {
   checkinEffect: document.querySelector("#checkinEffect"),
   clearCheckinButton: document.querySelector("#clearCheckinButton"),
   todayTimeline: document.querySelector("#todayTimeline"),
+  todaySummary: document.querySelector("#todaySummary"),
   todayQueueCount: document.querySelector("#todayQueueCount"),
   todayQueueList: document.querySelector("#todayQueueList"),
   modeButtons: document.querySelectorAll("[data-mode-option]"),
@@ -2510,6 +2511,56 @@ function renderTodayTimeline(entries, topItemId = "") {
   });
 }
 
+function todayBucketCounts(entries, topItemId = "") {
+  const counts = { now: 0, next: 0, later: 0, missed: 0, done: 0 };
+  entries.forEach((entry) => {
+    const bucket = timelineBucket(entry, topItemId);
+    counts[bucket] = (counts[bucket] || 0) + 1;
+  });
+  return counts;
+}
+
+function todaySummaryStats(entries, topItemId = "") {
+  const counts = todayBucketCounts(entries, topItemId);
+  const remaining = entries.filter((entry) => !isCompletedToday(entry.item)).length;
+  const due = entries.filter((entry) => {
+    if (isCompletedToday(entry.item)) return false;
+    const days = daysUntil(isRhythm(entry.item) ? entry.item.nextDue : entry.item.due);
+    return days !== null && days <= 0;
+  }).length;
+  const rhythms = entries.filter((entry) => !isCompletedToday(entry.item) && isRhythm(entry.item)).length;
+  return { ...counts, remaining, due, rhythms };
+}
+
+function makeTodaySummaryCard(label, value, detail, tone = "") {
+  const card = document.createElement("div");
+  card.className = `today-summary-card ${tone}`.trim();
+  const strong = document.createElement("strong");
+  strong.textContent = value;
+  const span = document.createElement("span");
+  span.textContent = label;
+  const small = document.createElement("small");
+  small.textContent = detail;
+  card.append(strong, span, small);
+  return card;
+}
+
+function renderTodaySummary(entries, topItemId = "") {
+  if (!els.todaySummary) return;
+  els.todaySummary.replaceChildren();
+  const stats = todaySummaryStats(entries, topItemId);
+  if (!entries.length) {
+    els.todaySummary.append(makeTodaySummaryCard("Remaining", "0", "clear", "clear"));
+    return;
+  }
+  els.todaySummary.append(
+    makeTodaySummaryCard("Remaining", String(stats.remaining), `${stats.due} due / ${stats.rhythms} rhythms`, stats.remaining ? "" : "clear"),
+    makeTodaySummaryCard("Now", String(stats.now), "top of list", stats.now ? "now" : ""),
+    makeTodaySummaryCard(stats.missed ? "Missed" : "Later", String(stats.missed || stats.later), stats.missed ? "still visible" : "coming up", stats.missed ? "missed" : ""),
+    makeTodaySummaryCard("Done", String(stats.done), "today", "done")
+  );
+}
+
 function makeTimelineItem(entry) {
   const item = entry.item;
   const button = document.createElement("button");
@@ -2777,6 +2828,7 @@ function renderRecommendation() {
   if (els.todayQueueCount) els.todayQueueCount.textContent = `${dashboardEntries.length} ${dashboardEntries.length === 1 ? "task" : "tasks"}`;
   els.recommendationPanel.replaceChildren();
   renderTodayTimeline(dashboardEntries, top?.item.id || "");
+  renderTodaySummary(dashboardEntries, top?.item.id || "");
   if (els.todayQueueList) els.todayQueueList.replaceChildren();
 
   if (!top) {

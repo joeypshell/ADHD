@@ -1713,6 +1713,71 @@ textarea {
   scrollbar-width: thin;
 }
 
+.today-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.today-summary:empty {
+  display: none;
+}
+
+.today-summary-card {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-height: 76px;
+  padding: 10px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.today-summary-card strong {
+  color: var(--teal);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.45rem, 6vw, 2rem);
+  line-height: 1;
+}
+
+.today-summary-card span {
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.today-summary-card small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-summary-card.now {
+  background: color-mix(in srgb, var(--green-soft) 48%, #fff);
+  border-color: color-mix(in srgb, var(--green) 22%, var(--line));
+}
+
+.today-summary-card.missed {
+  background: color-mix(in srgb, var(--coral-soft) 42%, #fff);
+  border-color: color-mix(in srgb, var(--coral) 22%, var(--line));
+}
+
+.today-summary-card.missed strong {
+  color: #9f2e31;
+}
+
+.today-summary-card.done,
+.today-summary-card.clear {
+  background: color-mix(in srgb, var(--green-soft) 32%, #fff);
+}
+
 .today-timeline > .empty-state {
   width: 100%;
 }
@@ -2942,6 +3007,10 @@ dialog::backdrop {
 
   .today-timeline {
     gap: 7px;
+  }
+
+  .today-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .timeline-group {
