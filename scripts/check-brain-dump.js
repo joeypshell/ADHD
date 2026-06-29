@@ -6,7 +6,9 @@ const functionNames = [
   "normalizeBrainDumpFragment",
   "brainDumpLooksActionable",
   "splitBrainDumpSegment",
-  "splitBrainDump"
+  "splitBrainDump",
+  "inferBrainKind",
+  "inferBrainArea"
 ];
 
 function extractFunction(name) {
@@ -26,13 +28,27 @@ function extractFunction(name) {
 
 const context = {};
 vm.createContext(context);
-vm.runInContext(`${functionNames.map(extractFunction).join("\n")}\nthis.splitBrainDump = splitBrainDump;`, context);
+vm.runInContext(
+  `function dashboardMode() { return "home"; }\n${functionNames.map(extractFunction).join("\n")}\nthis.splitBrainDump = splitBrainDump;\nthis.inferBrainKind = inferBrainKind;\nthis.inferBrainArea = inferBrainArea;`,
+  context
+);
 
 function assertTasks(input, expected) {
   const actual = context.splitBrainDump(input);
   const missing = expected.filter((task) => !actual.includes(task));
   if (missing.length) {
     throw new Error(`Expected ${JSON.stringify(input)} to include ${JSON.stringify(missing)}, got ${JSON.stringify(actual)}`);
+  }
+}
+
+function assertInference(input, expected) {
+  const kind = context.inferBrainKind(input);
+  const area = context.inferBrainArea(input, kind);
+  if (expected.kind && kind !== expected.kind) {
+    throw new Error(`Expected ${JSON.stringify(input)} kind ${expected.kind}, got ${kind}`);
+  }
+  if (expected.area && area !== expected.area) {
+    throw new Error(`Expected ${JSON.stringify(input)} area ${expected.area}, got ${area}`);
   }
 }
 
@@ -55,5 +71,11 @@ assertTasks(
   "remember to upload tests; maybe write novel scene. renew sticker",
   ["upload tests", "write novel scene", "renew sticker"]
 );
+
+assertInference("renew sticker", { kind: "rescue", area: "Home / Admin" });
+assertInference("call doctor", { kind: "project", area: "Health / Medical" });
+assertInference("call vet", { kind: "project", area: "Health / Medical" });
+assertInference("text mom", { kind: "project", area: "Relationships" });
+assertInference("call client", { kind: "project", area: "Work" });
 
 console.log("OK: brain dump extraction checks passed");

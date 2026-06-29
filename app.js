@@ -4022,7 +4022,8 @@ function splitBrainDump(text) {
 
 function inferBrainKind(text) {
   const lower = text.toLowerCase();
-  if (/\b(overdue|late|urgent|scary|avoid|avoiding|panic|rescue|red|expired|fee|fine|doctor|clinic|medical|tax|bill|sticker)\b/.test(lower)) return "rescue";
+  if (/\b(overdue|late|urgent|scary|avoid|avoiding|panic|rescue|red|expired|shutoff|collections?|eviction|deadline|past due|fee|fine)\b/.test(lower)) return "rescue";
+  if (/\b(?:renew|fix|handle|deal with|sort out|get)\b.*\b(?:sticker|registration|tax|bill|insurance|ticket)\b/.test(lower)) return "rescue";
   if (/\b(daily|weekly|monthly|every|each|routine|habit|always|workout|exercise|dishes|laundry|trash|gas|dinner|meds|medicine|refill)\b/.test(lower)) return "rhythm";
   if (/\b(maybe|someday|later|eventually|idea)\b/.test(lower)) return "later";
   return "project";
@@ -4031,12 +4032,12 @@ function inferBrainKind(text) {
 function inferBrainArea(text, kind) {
   const lower = text.toLowerCase();
   if (dashboardMode() === "work" || /\b(work|ticket|client|meeting|email|slack|report|deploy|code)\b/.test(lower)) return "Work";
-  if (/\b(doctor|clinic|medical|meds|medicine|refill|appointment|therapy|adhd)\b/.test(lower)) return "Health / Medical";
+  if (/\b(doctor|dentist|clinic|medical|meds|medicine|refill|appointment|therapy|adhd|pharmacy|prescription|vet|veterinarian|pet meds)\b/.test(lower)) return "Health / Medical";
   if (/\b(pay|bill|money|bank|tax|fee|fine|invoice)\b/.test(lower)) return "Money";
   if (/\b(write|novel|chapter|draft|story)\b/.test(lower)) return "Writing";
   if (/\b(workout|exercise|walk|run|gym|body)\b/.test(lower)) return "Body / Exercise";
-  if (/\b(call|text|friend|family|mom|dad|relationship)\b/.test(lower)) return "Relationships";
   if (kind === "rhythm" || /\b(dishes|laundry|trash|clean|gas|dinner|car|sticker)\b/.test(lower)) return "Home / Admin";
+  if (/\b(friend|family|mom|dad|partner|relationship|birthday|visit|hang out|text\s+(?:mom|dad|friend|family|partner))\b/.test(lower)) return "Relationships";
   return "Unsorted";
 }
 
@@ -4071,7 +4072,7 @@ function suggestedTinyStart(text, kind) {
   if (kind === "rhythm") return `Do the smallest version of ${text}`;
   if (kind === "rescue") return "Open this for 5 minutes";
   if (lower.includes("call")) return "Find the phone number";
-  if (lower.includes("email") || lower.includes("message")) return "Open a blank message";
+  if (lower.includes("text") || lower.includes("email") || lower.includes("message")) return "Open a blank message";
   if (lower.includes("clean")) return "Clear one visible surface";
   if (lower.includes("write")) return "Open the document";
   if (lower.includes("pay")) return "Open the bill or account";
