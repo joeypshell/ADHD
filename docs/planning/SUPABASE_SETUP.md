@@ -30,6 +30,37 @@ In Supabase Auth settings, add redirect URLs for:
 
 Add any additional local test ports used during browser QA.
 
+## Auth Providers
+
+Keep email magic link enabled as the fallback login path.
+
+Google and Apple login are optional Supabase Auth providers. Their provider client IDs and client secrets belong in the Supabase dashboard and the provider consoles, not in `sync-config.js` or any GitHub Pages file.
+
+### Google
+
+1. Create or use a Google Cloud project.
+2. Configure the OAuth consent screen.
+3. Create a Web OAuth client.
+4. Add the callback URL shown in Supabase Auth provider settings to the Google OAuth client.
+5. Paste the Google client ID and client secret into Supabase Auth -> Providers -> Google.
+6. Enable the Google provider in Supabase.
+
+The app starts this flow with Supabase provider id `google`.
+
+### Apple
+
+1. Configure Sign in with Apple in the Apple Developer account.
+2. Create the required Service ID / web auth configuration.
+3. Add the callback URL shown in Supabase Auth provider settings to the Apple web auth configuration.
+4. Paste the Apple client id / service id and secret material required by Supabase into Supabase Auth -> Providers -> Apple.
+5. Enable the Apple provider in Supabase.
+
+The app starts this flow with Supabase provider id `apple`.
+
+### B2B / Keycloak
+
+Do not add Keycloak for the first personal sync version. Keycloak or enterprise SSO can be revisited if the app becomes an organization-facing product with SAML/OIDC requirements.
+
 ## SQL Setup
 
 Run this in the Supabase SQL editor.

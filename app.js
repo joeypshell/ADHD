@@ -339,6 +339,8 @@ const els = {
   syncFeedback: document.querySelector("#syncFeedback"),
   syncEmail: document.querySelector("#syncEmail"),
   syncLoginButton: document.querySelector("#syncLoginButton"),
+  syncGoogleButton: document.querySelector("#syncGoogleButton"),
+  syncAppleButton: document.querySelector("#syncAppleButton"),
   syncLogoutButton: document.querySelector("#syncLogoutButton"),
   syncNowButton: document.querySelector("#syncNowButton"),
   syncChoiceDialog: document.querySelector("#syncChoiceDialog"),
@@ -4354,6 +4356,11 @@ function renderSyncStatus() {
     els.syncLoginButton.hidden = Boolean(state.sync?.userEmail);
     els.syncLoginButton.disabled = false;
   }
+  [els.syncGoogleButton, els.syncAppleButton].forEach((button) => {
+    if (!button) return;
+    button.hidden = Boolean(state.sync?.userEmail);
+    button.disabled = false;
+  });
   if (els.syncNowButton) els.syncNowButton.disabled = false;
   if (els.syncLogoutButton) {
     els.syncLogoutButton.hidden = !state.sync?.userEmail;
@@ -4477,6 +4484,24 @@ async function syncLogin() {
     setSyncFeedback("Login link sent. Open it on this same device/browser, then come back and press Sync now.", "ok");
   } catch (error) {
     setSyncFeedback(`Login failed: ${error.message || "Supabase could not send the link."}`, "warn");
+  }
+}
+
+async function syncProviderLogin(provider) {
+  const providerLabel = provider === "apple" ? "Apple" : "Google";
+  if (!requireSyncReady(`${providerLabel} login`)) return;
+  try {
+    const client = await getSupabaseClient();
+    if (!client) return;
+    const redirectTo = window.location.href.split("#")[0];
+    const { error } = await client.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo }
+    });
+    if (error) throw error;
+    setSyncFeedback(`Opening ${providerLabel} login. Return here after sign-in, then press Sync now.`, "ok");
+  } catch (error) {
+    setSyncFeedback(`${providerLabel} login failed: ${error.message || "Supabase could not start provider login."}`, "warn");
   }
 }
 
@@ -4861,6 +4886,8 @@ function bindEvents() {
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
   els.syncLoginButton.addEventListener("click", syncLogin);
+  els.syncGoogleButton.addEventListener("click", () => syncProviderLogin("google"));
+  els.syncAppleButton.addEventListener("click", () => syncProviderLogin("apple"));
   els.syncLogoutButton.addEventListener("click", syncLogout);
   els.syncNowButton.addEventListener("click", syncNow);
   els.closeSyncChoiceButton.addEventListener("click", () => els.syncChoiceDialog.close());

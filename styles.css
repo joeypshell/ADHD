@@ -1147,6 +1147,10 @@ textarea {
   gap: 8px;
 }
 
+.sync-actions .provider-button {
+  background: rgba(255, 255, 255, 0.86);
+}
+
 .sync-email-row {
   display: grid;
   gap: 6px;
