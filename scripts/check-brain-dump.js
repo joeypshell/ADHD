@@ -5,6 +5,7 @@ const source = fs.readFileSync("app.js", "utf8");
 const functionNames = [
   "normalizeBrainDumpFragment",
   "brainDumpLooksActionable",
+  "splitUnpunctuatedBrainDumpSegment",
   "splitBrainDumpSegment",
   "splitBrainDump",
   "inferBrainKind",
@@ -77,6 +78,11 @@ assertTasks(
 assertTasks(
   "remember to upload tests; maybe write novel scene. renew sticker",
   ["upload tests", "write novel scene", "renew sticker"]
+);
+
+assertTasks(
+  "call girlfriend do work project build deck renew sticker cook dinner pick up kids work out",
+  ["call girlfriend", "do work project", "build deck", "renew sticker", "cook dinner", "pick up kids", "work out"]
 );
 
 assertInference("renew sticker", { kind: "rescue", area: "Home / Admin" });

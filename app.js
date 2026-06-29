@@ -5,7 +5,7 @@ const MAGIC_LINK_EMAIL_COOLDOWN_MS = 60 * 1000;
 const MAGIC_LINK_RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000;
 const AUTO_SYNC_DEBOUNCE_MS = 2500;
 const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
-const VOICE_CAPTURE_TIMEOUT_MS = 12 * 1000;
+const VOICE_CAPTURE_MAX_MS = 60 * 1000;
 const APPLE_LOGIN_ENABLED = false;
 const POMODORO_PRESETS = [
   { id: "classic", label: "25 + 5", workMinutes: 25, breakMinutes: 5 },
@@ -3909,8 +3909,8 @@ function setVoiceStatus(target, message) {
 }
 
 function voicePrompt(target) {
-  if (target === "brain") return "Listening for up to 12 seconds. Review the words before finding tasks.";
-  return "Listening for up to 12 seconds. Review the words before tapping Add.";
+  if (target === "brain") return "Listening. Pause when done; review the words before finding tasks.";
+  return "Listening. Pause when done; review the words before tapping Add.";
 }
 
 function voiceDoneMessage(target) {
@@ -3921,6 +3921,18 @@ function voiceDoneMessage(target) {
 function appendVoiceTranscript(input, transcript, multiline = false) {
   const current = input.value.trim();
   input.value = [current, transcript].filter(Boolean).join(multiline ? "\n" : " ");
+}
+
+function moveCursorToEnd(input) {
+  const end = input.value.length;
+  if (typeof input.setSelectionRange === "function") input.setSelectionRange(end, end);
+}
+
+function useDeviceDictationFallback(target, input) {
+  input.focus();
+  moveCursorToEnd(input);
+  const action = target === "brain" ? "Find tasks" : "Add";
+  setVoiceStatus(target, `This browser cannot start dictation here. Use the keyboard mic, then tap ${action}.`);
 }
 
 function clearVoiceCaptureTimeout() {
@@ -3942,7 +3954,7 @@ function startVoiceCapture(target = "quick") {
   const { input, multiline } = voiceTarget(target);
   if (!input) return;
   if (!Recognition) {
-    setVoiceStatus(target, "Voice capture is not supported in this browser.");
+    useDeviceDictationFallback(target, input);
     return;
   }
 
@@ -3996,11 +4008,11 @@ function startVoiceCapture(target = "quick") {
     recognition.start();
     voiceCaptureTimeoutId = window.setTimeout(() => {
       if (voiceRecognition !== recognition) return;
-      setVoiceStatus(target, "Voice capture paused. Tap Mic to add more.");
+      setVoiceStatus(target, "Voice capture paused after 1 minute. Tap Mic to add more.");
       clearVoiceCaptureTimeout();
       stopVoiceRecognition(recognition, "abort");
       if (voiceRecognition === recognition) voiceRecognition = null;
-    }, VOICE_CAPTURE_TIMEOUT_MS);
+    }, VOICE_CAPTURE_MAX_MS);
   } catch {
     setVoiceStatus(target, "Voice capture could not start in this browser.");
     clearVoiceCaptureTimeout();
@@ -4074,13 +4086,22 @@ function brainDumpLooksActionable(entry) {
   return true;
 }
 
+function splitUnpunctuatedBrainDumpSegment(segment) {
+  const normalized = normalizeBrainDumpFragment(segment);
+  if (!normalized) return [];
+  return normalized
+    .replace(/\s+(?=(?:ask|book|build|buy|call|check|clean|cook|do|draft|drop off|email|fix|fold|get|handle|make|message|order|pay|pick up|plan|prep|refill|renew|return|schedule|send|submit|take|text|update|wash|work out|workout|write)\b)/gi, "\n")
+    .split("\n")
+    .map(normalizeBrainDumpFragment)
+    .filter(brainDumpLooksActionable);
+}
+
 function splitBrainDumpSegment(segment) {
   const normalized = normalizeBrainDumpFragment(segment);
   if (!normalized) return [];
   return normalized
     .split(/\s*(?:,|\/|\+)\s+|\s+(?:and|also|then|plus|&)\s+/i)
-    .map(normalizeBrainDumpFragment)
-    .filter(brainDumpLooksActionable);
+    .flatMap(splitUnpunctuatedBrainDumpSegment);
 }
 
 function splitBrainDump(text) {
