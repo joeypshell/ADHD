@@ -149,7 +149,7 @@ Today:
 - item detail cockpit with why-today, context, next visible step, steps, Do/Done/Snooze/Stuck/Edit
 - quick capture with browser voice fill-in, pause-based auto-stop, and a tiny-start follow-up
 
-Doing and timers are intentionally separate. `status: "now"` means the item is being worked on or should stay at the top; a `focusSession` exists only when the user explicitly starts the timer. Today and item detail use explicit snooze destinations: 15 minutes, 1 hour, tonight, or tomorrow.
+Doing and timers are intentionally separate. `status: "now"` means the item is being worked on or should stay at the top; a `focusSession` exists only when the user explicitly starts the timer. Finished focus breaks can be dismissed, swiped away from the sticky anchor, or cleared by completing/restarting the item timer. Today and item detail use explicit snooze destinations: 15 minutes, 1 hour, tonight, or tomorrow.
 
 Add:
 

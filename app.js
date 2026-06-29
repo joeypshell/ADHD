@@ -386,6 +386,7 @@ let emptyWizardAutoOpened = false;
 let addMode = "capture";
 let focusTimerId = 0;
 let focusSetupItemId = "";
+let focusAnchorSwipeStartX = 0;
 let selectedPomodoroPresetId = "classic";
 let selectedBuildUpId = "none";
 let brainDumpCandidates = [];
@@ -545,6 +546,7 @@ const els = {
   focusPresetChoices: document.querySelector("#focusPresetChoices"),
   focusBuildChoices: document.querySelector("#focusBuildChoices"),
   focusStartButton: document.querySelector("#focusStartButton"),
+  focusTimerShell: document.querySelector(".focus-timer-shell"),
   focusStateLabel: document.querySelector("#focusStateLabel"),
   focusTime: document.querySelector("#focusTime"),
   focusProgressBar: document.querySelector("#focusProgressBar"),
@@ -2167,6 +2169,14 @@ function isFinishedFocusSession(session = state.focusSession) {
   return session.phase === "done" || (!session.running && sessionRemainingMs(session) <= 0);
 }
 
+function clearFinishedFocusSession() {
+  if (!isFinishedFocusSession(state.focusSession)) return false;
+  state.focusSession = null;
+  saveState();
+  syncFocusTimer();
+  return true;
+}
+
 function clearFinishedFocusSessionForItem(itemId) {
   if (!state.focusSession || state.focusSession.itemId !== itemId || !isFinishedFocusSession(state.focusSession)) return false;
   state.focusSession = null;
@@ -2970,8 +2980,9 @@ function renderFocusAnchor() {
   if (!session || !item) return;
 
   const remaining = sessionRemainingMs(session);
-  const durationMs = Math.max(1, Number(session.durationMinutes || 10) * 60000);
+  const durationMs = focusPhaseDurationMs(session);
   const completePercent = Math.min(100, Math.max(0, ((durationMs - remaining) / durationMs) * 100));
+  const finished = isFinishedFocusSession(session);
 
   const main = document.createElement("button");
   main.type = "button";
@@ -2980,11 +2991,11 @@ function renderFocusAnchor() {
 
   const icon = document.createElement("span");
   icon.className = "focus-anchor-icon";
-  icon.append(makeIcon(remaining <= 0 ? "check" : session.running ? "pause" : "clock"));
+  icon.append(makeIcon(finished ? "check" : session.running ? "pause" : "clock"));
 
   const label = document.createElement("span");
   label.className = "focus-anchor-label";
-  label.textContent = session.running ? "Doing now" : remaining <= 0 ? "Time up" : "Paused";
+  label.textContent = finished ? focusPhaseLabel(session) : session.running ? "Doing now" : "Paused";
   const title = document.createElement("strong");
   title.textContent = item.title;
   const step = document.createElement("span");
@@ -3008,12 +3019,26 @@ function renderFocusAnchor() {
 
   const actions = document.createElement("div");
   actions.className = "focus-anchor-actions";
-  actions.append(
-    createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button small-button", completeFocusSession),
-    createButton(session.running ? "Pause" : "Resume", "secondary-button small-button", pauseFocusSession),
-    createButton("1 hour", "secondary-button small-button", () => snoozeFocusSession("hour")),
-    createButton("+5 min", "secondary-button small-button", () => extendFocusSession(5))
-  );
+  if (finished) {
+    actions.append(
+      createButton("Dismiss", "primary-button small-button", () => {
+        clearFocusSession();
+        render();
+      }),
+      createButton("Restart", "secondary-button small-button", () => {
+        const itemId = item.id;
+        clearFocusSession();
+        openFocusSetup(itemId);
+      })
+    );
+  } else {
+    actions.append(
+      createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button small-button", completeFocusSession),
+      createButton(session.running ? "Pause" : "Resume", "secondary-button small-button", pauseFocusSession),
+      createButton("1 hour", "secondary-button small-button", () => snoozeFocusSession("hour")),
+      createButton("+5 min", "secondary-button small-button", () => extendFocusSession(5))
+    );
+  }
 
   els.focusAnchor.append(main, time, progress, actions);
 }
@@ -4770,7 +4795,7 @@ function startDoingItem(itemId) {
 function openFocusSetup(itemId) {
   const item = getItem(itemId);
   if (!item) return;
-  clearFinishedFocusSessionForItem(itemId);
+  clearFinishedFocusSession();
   focusSetupItemId = itemId;
   if (!POMODORO_PRESETS.some((preset) => preset.id === selectedPomodoroPresetId)) selectedPomodoroPresetId = "classic";
   if (!BUILDUP_OPTIONS.some((option) => option.id === selectedBuildUpId)) selectedBuildUpId = "none";
@@ -4784,6 +4809,7 @@ function renderFocusSetup() {
   els.focusMeta.textContent = itemMeta(item);
   els.focusTitle.textContent = "Pomodoro";
   els.focusSetup.hidden = false;
+  if (els.focusTimerShell) els.focusTimerShell.hidden = true;
   els.focusStateLabel.textContent = "Ready";
   els.focusTime.textContent = pomodoroPresetById(selectedPomodoroPresetId).label;
   els.focusProgressBar.style.width = "0%";
@@ -4904,13 +4930,14 @@ function updateFocusDisplays() {
   const timeText = formatCountdown(remaining);
   const stateText = focusSessionStateText(session);
 
-  document.querySelectorAll("[data-focus-remaining]").forEach((node) => {
+  document.querySelectorAll(`[data-focus-remaining="${session.itemId}"]`).forEach((node) => {
     node.textContent = stateText;
   });
   renderFocusAnchor();
 
   if (!els.focusDialog.open) return;
   if (els.focusSetup) els.focusSetup.hidden = true;
+  if (els.focusTimerShell) els.focusTimerShell.hidden = false;
   const focusActions = els.focusDoneButton?.closest(".focus-actions");
   if (focusActions) focusActions.hidden = false;
   els.focusMeta.textContent = itemMeta(item);
@@ -4920,12 +4947,13 @@ function updateFocusDisplays() {
   els.focusProgressBar.style.width = `${completePercent}%`;
   els.focusStep.textContent = focusPhaseInstruction(item, session);
   els.focusDoneButton.hidden = false;
-  els.focusPauseButton.hidden = false;
-  els.focusAddFiveButton.hidden = false;
-  els.focusSnoozeButton.hidden = false;
-  if (els.focusSnoozeChoices) els.focusSnoozeChoices.hidden = false;
   const breakPhase = session.phase === "break" || session.phase === "done";
+  const finished = isFinishedFocusSession(session);
   els.focusDoneButton.textContent = breakPhase ? "End break" : isRhythm(item) ? "Done today" : "Done step";
+  els.focusPauseButton.hidden = finished;
+  els.focusAddFiveButton.hidden = finished;
+  els.focusSnoozeButton.hidden = finished;
+  if (els.focusSnoozeChoices) els.focusSnoozeChoices.hidden = finished;
   els.focusPauseButton.textContent = session.running ? "Pause" : "Resume";
   if (els.focusSnoozeChoices) {
     els.focusSnoozeChoices.replaceChildren();
@@ -4945,7 +4973,7 @@ function updateFocusDisplays() {
 }
 
 function renderFocusDialog() {
-  if (!activeFocusSession() && focusSetupItemId) {
+  if (focusSetupItemId) {
     renderFocusSetup();
     return;
   }
@@ -6021,6 +6049,17 @@ function bindEvents() {
   document.querySelectorAll("[data-stuck-action]").forEach((button) => {
     button.addEventListener("click", () => handleStuckAction(button.dataset.stuckAction));
   });
+  if (els.focusAnchor) {
+    els.focusAnchor.addEventListener("touchstart", (event) => {
+      focusAnchorSwipeStartX = event.changedTouches[0]?.clientX || 0;
+    }, { passive: true });
+    els.focusAnchor.addEventListener("touchend", (event) => {
+      const endX = event.changedTouches[0]?.clientX || 0;
+      if (Math.abs(endX - focusAnchorSwipeStartX) < 80 || !isFinishedFocusSession()) return;
+      clearFocusSession();
+      render();
+    }, { passive: true });
+  }
   window.addEventListener("scroll", updateStickyRecommendationState, { passive: true });
   window.addEventListener("resize", updateStickyRecommendationState);
 }
