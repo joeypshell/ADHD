@@ -14,6 +14,7 @@ window.LCC_SYNC_CONFIG = {
   supabaseUrl: "https://YOUR_PROJECT.supabase.co",
   supabaseAnonKey: "YOUR_PUBLIC_ANON_KEY",
   supabaseJsUrl: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
+  redirectUrl: "https://joeypshell.github.io/ADHD/",
   provider: "supabase"
 };
 ```
@@ -29,6 +30,8 @@ In Supabase Auth settings, add redirect URLs for:
 - `http://localhost:8080/`
 
 Add any additional local test ports used during browser QA.
+
+Set the app's `redirectUrl` in `sync-config.js` to the GitHub Pages URL for normal use. Leaving Supabase's Site URL or the app redirect URL at `http://localhost:3000` will make login emails open a broken local page on other devices.
 
 ## Auth Providers
 

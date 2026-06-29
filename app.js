@@ -4293,7 +4293,8 @@ function publicSyncConfig() {
     provider: config.provider || "supabase",
     supabaseUrl: String(config.supabaseUrl || "").trim(),
     supabaseAnonKey: String(config.supabaseAnonKey || "").trim(),
-    supabaseJsUrl: String(config.supabaseJsUrl || SUPABASE_JS_URL).trim()
+    supabaseJsUrl: String(config.supabaseJsUrl || SUPABASE_JS_URL).trim(),
+    redirectUrl: String(config.redirectUrl || "").trim()
   };
 }
 
@@ -4411,6 +4412,10 @@ function syncEmailValue() {
   return String(els.syncEmail?.value || "").trim();
 }
 
+function syncRedirectUrl() {
+  return publicSyncConfig().redirectUrl || window.location.href.split("#")[0];
+}
+
 function syncDisplayEmail(user) {
   return user?.email || user?.user_metadata?.email || "";
 }
@@ -4475,10 +4480,9 @@ async function syncLogin() {
   try {
     const client = await getSupabaseClient();
     if (!client) return;
-    const redirectTo = window.location.href.split("#")[0];
     const { error } = await client.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: redirectTo }
+      options: { emailRedirectTo: syncRedirectUrl() }
     });
     if (error) throw error;
     setSyncFeedback("Login link sent. Open it on this same device/browser, then come back and press Sync now.", "ok");
@@ -4493,10 +4497,9 @@ async function syncProviderLogin(provider) {
   try {
     const client = await getSupabaseClient();
     if (!client) return;
-    const redirectTo = window.location.href.split("#")[0];
     const { error } = await client.auth.signInWithOAuth({
       provider,
-      options: { redirectTo }
+      options: { redirectTo: syncRedirectUrl() }
     });
     if (error) throw error;
     setSyncFeedback(`Opening ${providerLabel} login. Return here after sign-in, then press Sync now.`, "ok");
