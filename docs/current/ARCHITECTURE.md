@@ -143,7 +143,7 @@ Today:
 - recommendation card
 - compact summary strip for remaining / now / missed-or-later / done
 - optional visual timeline: Now / Next / Later / Missed / Done
-- complete Today list with direct Doing, Done, snapshot Undo confirmation, and same-day row Undo actions
+- complete Today list with direct Doing, Done, snapshot Undo confirmation, Snooze return confirmation, and same-day row Undo actions
 - item detail cockpit with why-today, context, next visible step, steps, Do/Done/Snooze/Stuck/Edit
 - quick capture with browser voice fill-in and a tiny-start follow-up
 
@@ -162,6 +162,7 @@ Lists:
 - filterable item cards
 - status actions
 - edit dialog
+- entry points to Rhythms and Map
 
 Map:
 
@@ -259,6 +260,7 @@ This is acceptable for now, but large features should avoid making `renderRecomm
 - No automatic cross-device sync.
 - No per-item cloud merge.
 - No app-level end-to-end encryption for Supabase data.
+- Google/Apple provider setup and custom SMTP remain external Supabase dashboard work.
 - No cloud speech service or AI voice parsing.
 - No AI-backed task extraction or prioritization.
 - No native or cross-device reminder system.

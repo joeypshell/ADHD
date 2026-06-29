@@ -1860,7 +1860,7 @@ textarea {
   background: color-mix(in srgb, var(--green-soft) 32%, #fff);
 }
 
-.completion-notice {
+.today-notice {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
@@ -1873,18 +1873,23 @@ textarea {
   border-radius: 16px;
 }
 
-.completion-notice div:first-child {
+.today-notice.notice-snooze {
+  background: color-mix(in srgb, var(--gold-soft) 42%, #fff);
+  border-color: color-mix(in srgb, var(--gold) 24%, var(--line));
+}
+
+.today-notice div:first-child {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.completion-notice strong {
+.today-notice strong {
   font-size: 0.9rem;
   line-height: 1.18;
 }
 
-.completion-notice span {
+.today-notice span {
   overflow: hidden;
   color: var(--muted);
   font-size: 0.8rem;
@@ -1893,7 +1898,7 @@ textarea {
   white-space: nowrap;
 }
 
-.completion-notice-actions {
+.today-notice-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;

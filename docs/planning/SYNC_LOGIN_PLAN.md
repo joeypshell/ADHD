@@ -71,6 +71,35 @@ Good fit only if this remains a personal tool.
 
 Use Supabase first. Keep the runtime app static on GitHub Pages, keep `localStorage` as the offline cache, and store one user-scoped JSON state document in Supabase for the first version.
 
+## Current Status As Of 2026-06-29
+
+Implemented in the app:
+
+- public Supabase config loading through `sync-config.js`
+- email magic-link login button
+- Google and Apple provider login buttons that call Supabase provider ids
+- logout
+- manual Sync now
+- one-document `user_state` upload/download
+- first-sync choice dialog
+- simple conflict choice
+- local cooldown guard after email sends and rate-limit errors
+
+Known setup blockers:
+
+- Supabase's built-in email sender has a low hourly quota, so repeated magic-link testing can hit `email rate limit exceeded`.
+- Google and Apple providers must be enabled in the Supabase dashboard before those buttons can succeed.
+- If magic links remain the fallback, configure custom SMTP or a Send Email hook before raising email-send rate limits.
+- Redirect URLs must include the GitHub Pages URL and whatever local test port is being used.
+- Do not add Keycloak for the personal version unless this becomes an organization/enterprise product.
+
+Next auth decision:
+
+1. Enable Google OAuth first for practical cross-device login.
+2. Keep email magic link as fallback, but add custom SMTP before serious repeated testing.
+3. Add Apple only after Google is working, because Apple setup has more external account requirements.
+4. Re-run the smoke test in `docs/planning/SUPABASE_SMOKE_TEST.md`.
+
 Why one JSON document first:
 
 - It matches the current normalized state shape.

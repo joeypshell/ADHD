@@ -1,6 +1,13 @@
 # Supabase Smoke Test
 
-Live Supabase verification is pending real project credentials in `sync-config.js` and provider setup in Supabase.
+Live Supabase verification is pending provider setup and a cooldown window after email rate-limit testing.
+
+Current known state as of 2026-06-29:
+
+- `sync-config.js` contains public Supabase project configuration for the GitHub Pages app.
+- Email magic link worked on mobile, then repeated testing hit Supabase's email quota.
+- Google and Apple providers were not yet enabled in the Supabase dashboard.
+- The next auth pass should test Google first, then email magic link with custom SMTP or after the quota resets.
 
 Run these checks after:
 

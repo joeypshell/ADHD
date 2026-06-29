@@ -370,7 +370,7 @@ let addMode = "capture";
 let focusTimerId = 0;
 let brainDumpCandidates = [];
 let captureFollowupItemId = "";
-let completionNotice = null;
+let todayNotice = null;
 let voiceRecognition = null;
 let supabaseClientPromise = null;
 let syncChoiceContext = null;
@@ -462,6 +462,7 @@ const els = {
   projectList: document.querySelector("#projectList"),
   areaFilter: document.querySelector("#areaFilter"),
   openMapButton: document.querySelector("#openMapButton"),
+  openRhythmsButton: document.querySelector("#openRhythmsButton"),
   statusFilters: document.querySelector("#statusFilters"),
   clearFilterButton: document.querySelector("#clearFilterButton"),
   mindMap: document.querySelector("#mindMap"),
@@ -1948,18 +1949,32 @@ function cloneItemSnapshot(item) {
 }
 
 function completionMessage(item, action = "step") {
-  if (isRhythm(item)) return "Rhythm marked done for today.";
+  if (isRhythm(item)) return `Done today. Returns ${rhythmNextDueText(item)}.`;
   if (action === "all") return "Task marked done.";
   return "Step marked done.";
 }
 
 function rememberCompletion(before, action = "step") {
   if (!before) return;
-  completionNotice = {
+  const current = getItem(before.id);
+  todayNotice = {
+    kind: "done",
     itemId: before.id,
     title: before.title,
-    message: completionMessage(before, action),
+    message: completionMessage(current || before, action),
     snapshot: cloneItemSnapshot(before),
+    createdAt: Date.now()
+  };
+}
+
+function rememberSnooze(item, snoozedUntil) {
+  if (!item) return;
+  todayNotice = {
+    kind: "snooze",
+    itemId: item.id,
+    title: item.title,
+    message: `Snoozed until ${formatDateTime(snoozedUntil)}.`,
+    snapshot: null,
     createdAt: Date.now()
   };
 }
@@ -1999,7 +2014,7 @@ function completeRhythm(itemId) {
 function undoCompleteItem(itemId) {
   const item = getItem(itemId);
   if (!item) return;
-  if (completionNotice?.itemId === itemId) completionNotice = null;
+  if (todayNotice?.itemId === itemId) todayNotice = null;
   const now = new Date().toISOString();
   clearFocusForItem(itemId);
   if (isRhythm(item)) {
@@ -2028,10 +2043,10 @@ function undoCompleteItem(itemId) {
 }
 
 function restoreCompletionSnapshot() {
-  if (!completionNotice?.snapshot) return;
-  const snapshot = cloneItemSnapshot(completionNotice.snapshot);
+  if (!todayNotice?.snapshot) return;
+  const snapshot = cloneItemSnapshot(todayNotice.snapshot);
   state.items = state.items.map((item) => (item.id === snapshot.id ? snapshot : item));
-  completionNotice = null;
+  todayNotice = null;
   saveState();
   render();
   showView("now");
@@ -2468,7 +2483,8 @@ function itemMeta(item) {
   const parts = [isRhythm(item) ? "Rhythm" : "Project", modeMeta(item.mode).label, formatTimeWindow(item), item.area, statusLabel(item.status)];
   if (isRhythm(item)) {
     parts.push(cadenceMeta(item.cadence).label);
-    if (item.nextDue) parts.push(`Due ${formatDate(item.nextDue)}`);
+    if (item.lastDone === todayIso()) parts.push(`Next ${rhythmNextDueText(item)}`);
+    else if (item.nextDue) parts.push(`Due ${formatDate(item.nextDue)}`);
   } else if (item.due) parts.push(`Due ${formatDate(item.due)}`);
   if (item.review) parts.push(`Review ${formatDate(item.review)}`);
   if (isSnoozed(item)) parts.push(`Snoozed ${formatDateTime(item.snoozedUntil)}`);
@@ -2530,7 +2546,8 @@ function detailContextText(item) {
     return [
       cadenceMeta(item.cadence).label,
       rhythmDueLabel(item),
-      item.lastDone ? `last ${formatDate(item.lastDone)}` : ""
+      item.lastDone ? `last ${formatDate(item.lastDone)}` : "",
+      item.lastDone === todayIso() ? `next ${rhythmNextDueText(item)}` : ""
     ].filter(Boolean).join(" / ");
   }
   const doneSteps = item.steps.filter((step) => step.done).length;
@@ -3083,12 +3100,6 @@ function renderRecommendation() {
     timeDetail
   );
 
-  const reasonStrip = document.createElement("div");
-  reasonStrip.className = "next-reason-strip";
-  recommendationReason(item, 6).forEach((reason, index) => {
-    reasonStrip.append(makeChip(reason, index === 0 ? "strong" : ""));
-  });
-
   const progress = document.createElement("div");
   progress.className = "progress-line next-progress";
   progress.setAttribute("aria-hidden", "true");
@@ -3122,7 +3133,7 @@ function renderRecommendation() {
     }));
   }
 
-  body.append(main, detailGrid, reasonStrip, progress);
+  body.append(main, detailGrid, progress);
   if (isFocusItem(item)) body.append(makeFocusPill(item));
   body.append(actions, makeSnoozeChoices(item.id));
   panel.append(band, body);
@@ -3143,7 +3154,7 @@ function todayQueueGroup(entry, topItemId = "") {
 function renderTodayQueueList(entries, topItemId = "") {
   if (!els.todayQueueList) return;
   els.todayQueueList.replaceChildren();
-  const notice = makeCompletionNotice();
+  const notice = makeTodayNotice();
   if (notice) els.todayQueueList.append(notice);
   const groups = [
     { id: "now", label: "Now" },
@@ -3179,32 +3190,30 @@ function renderTodayQueueList(entries, topItemId = "") {
   });
 }
 
-function makeCompletionNotice() {
-  if (!completionNotice) return null;
-  if (Date.now() - Number(completionNotice.createdAt || 0) > 5 * 60 * 1000) {
-    completionNotice = null;
+function makeTodayNotice() {
+  if (!todayNotice) return null;
+  if (Date.now() - Number(todayNotice.createdAt || 0) > 5 * 60 * 1000) {
+    todayNotice = null;
     return null;
   }
   const card = document.createElement("section");
-  card.className = "completion-notice";
+  card.className = `today-notice notice-${todayNotice.kind || "info"}`;
   card.setAttribute("aria-live", "polite");
 
   const copy = document.createElement("div");
   const title = document.createElement("strong");
-  title.textContent = completionNotice.message || "Done.";
+  title.textContent = todayNotice.message || "Updated.";
   const detail = document.createElement("span");
-  detail.textContent = completionNotice.title;
+  detail.textContent = todayNotice.title;
   copy.append(title, detail);
 
   const actions = document.createElement("div");
-  actions.className = "completion-notice-actions";
-  actions.append(
-    createButton("Undo", "secondary-button small-button", restoreCompletionSnapshot),
-    createButton("OK", "ghost-button small-button", () => {
-      completionNotice = null;
-      render();
-    })
-  );
+  actions.className = "today-notice-actions";
+  if (todayNotice.snapshot) actions.append(createButton("Undo", "secondary-button small-button", restoreCompletionSnapshot));
+  actions.append(createButton("OK", "ghost-button small-button", () => {
+    todayNotice = null;
+    render();
+  }));
 
   card.append(copy, actions);
   return card;
@@ -3326,6 +3335,17 @@ function rhythmDueLabel(item) {
   return `due in ${dueDays}d`;
 }
 
+function rhythmNextDueText(item) {
+  if (!isRhythm(item)) return "";
+  if (item.cadence === "asneeded" || !item.nextDue) return "when you ask for it";
+  const dueDays = rhythmDueDays(item);
+  if (dueDays === 0) return "today";
+  if (dueDays === 1) return "tomorrow";
+  if (dueDays === 9999) return formatDate(item.nextDue);
+  if (dueDays < 0) return `${formatDate(item.nextDue)} (${Math.abs(dueDays)}d overdue)`;
+  return `${formatDate(item.nextDue)} (in ${dueDays}d)`;
+}
+
 function rhythmBadgeText(item) {
   if (isSnoozed(item)) return "snoozed";
   const dueDays = rhythmDueDays(item);
@@ -3394,7 +3414,8 @@ function makeRhythmCard(item, compact = false) {
   meta.textContent = [
     cadenceMeta(item.cadence).label,
     rhythmDueLabel(item),
-    item.lastDone ? `last ${formatDate(item.lastDone)}` : ""
+    item.lastDone ? `last ${formatDate(item.lastDone)}` : "",
+    item.lastDone === todayIso() ? `next ${rhythmNextDueText(item)}` : ""
   ].filter(Boolean).join(" / ");
   const title = document.createElement("h3");
   title.textContent = item.title;
@@ -3415,7 +3436,7 @@ function makeRhythmCard(item, compact = false) {
   const actions = document.createElement("div");
   actions.className = "rhythm-actions";
   actions.append(
-    createButton("Done", "primary-button", () => completeRhythm(item.id)),
+    createButton("Done", "primary-button", () => completeTodayAction(item.id)),
     createButton("Make now", "secondary-button", () => {
       startDoingItem(item.id);
       showView("now");
@@ -4377,10 +4398,12 @@ function snoozeItem(itemId, duration) {
     tonight: nextAtHour(18),
     tomorrow: tomorrowAt(9)
   }[duration] || addHours(1);
+  rememberSnooze(item, snoozedUntil);
   updateItem(itemId, {
     snoozedUntil,
     snoozeCount: item.snoozeCount + 1
   }, { touch: false });
+  showView("now");
   syncFocusTimer();
 }
 
@@ -5253,7 +5276,7 @@ async function enableRhythmAlerts() {
 }
 
 function showView(view) {
-  const navView = view === "map" ? "projects" : view;
+  const navView = view === "rhythms" ? "projects" : view;
   els.navButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.view === navView));
   els.views.forEach((panel) => panel.classList.toggle("is-active", panel.dataset.viewPanel === view));
 }
@@ -5344,6 +5367,7 @@ function bindEvents() {
     render();
   });
   els.openMapButton.addEventListener("click", () => showView("map"));
+  els.openRhythmsButton.addEventListener("click", () => showView("rhythms"));
 
   els.markReviewedButton.addEventListener("click", () => {
     state.lastReviewed = new Date().toISOString();
