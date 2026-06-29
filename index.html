@@ -350,18 +350,11 @@
           <div class="sync-actions">
             <button class="secondary-button" id="syncLoginButton" type="button">Send login link</button>
             <button class="secondary-button provider-button" id="syncGoogleButton" type="button">Continue with Google</button>
-            <button class="secondary-button provider-button" id="syncAppleButton" type="button">Continue with Apple</button>
+            <button class="secondary-button provider-button is-coming-soon" id="syncAppleButton" type="button" disabled>Apple coming soon</button>
             <button class="secondary-button" id="syncNowButton" type="button">Sync now</button>
             <button class="ghost-button" id="syncLogoutButton" type="button">Log out</button>
           </div>
-          <details class="provider-setup-note">
-            <summary>Google provider setup</summary>
-            <ul>
-              <li>Enable Google in Supabase Auth providers.</li>
-              <li>Use a Google Web OAuth client and the Supabase callback URL.</li>
-              <li>Keep Google Client ID and Client Secret in Supabase only.</li>
-            </ul>
-          </details>
+          <p class="sync-provider-note">Google sign-in is active. Apple sign-in is parked for later.</p>
           <p class="sync-feedback" id="syncFeedback" aria-live="polite"></p>
         </section>
         <div class="backup-actions">

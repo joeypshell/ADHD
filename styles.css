@@ -1233,7 +1233,16 @@ textarea {
   background: rgba(255, 255, 255, 0.86);
 }
 
-.provider-setup-note {
+.sync-actions .provider-button.is-coming-soon,
+.sync-actions .provider-button:disabled {
+  color: #89939a;
+  background: #eef1f0;
+  border-color: #d8dedb;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.sync-provider-note {
   padding: 10px 12px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.72);
@@ -1242,19 +1251,7 @@ textarea {
   font-size: 0.82rem;
   font-weight: 800;
   line-height: 1.35;
-}
-
-.provider-setup-note summary {
-  color: var(--ink);
-  cursor: pointer;
-  font-weight: 950;
-}
-
-.provider-setup-note ul {
-  display: grid;
-  gap: 4px;
-  margin: 8px 0 0;
-  padding-left: 18px;
+  margin: 0;
 }
 
 .sync-email-row {

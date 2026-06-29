@@ -5,6 +5,7 @@ const MAGIC_LINK_EMAIL_COOLDOWN_MS = 60 * 1000;
 const MAGIC_LINK_RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000;
 const AUTO_SYNC_DEBOUNCE_MS = 2500;
 const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
+const APPLE_LOGIN_ENABLED = false;
 
 const AREAS = [
   "Work",
@@ -4849,6 +4850,12 @@ function renderSyncStatus() {
     button.hidden = Boolean(state.sync?.userEmail);
     button.disabled = false;
   });
+  if (els.syncAppleButton) {
+    els.syncAppleButton.hidden = Boolean(state.sync?.userEmail);
+    els.syncAppleButton.disabled = !APPLE_LOGIN_ENABLED;
+    els.syncAppleButton.textContent = APPLE_LOGIN_ENABLED ? "Continue with Apple" : "Apple coming soon";
+    els.syncAppleButton.title = APPLE_LOGIN_ENABLED ? "" : "Apple sign-in is parked for later.";
+  }
   if (els.syncNowButton) els.syncNowButton.disabled = false;
   if (els.syncLogoutButton) {
     els.syncLogoutButton.hidden = !state.sync?.userEmail;
@@ -4996,6 +5003,10 @@ async function syncLogin() {
 
 async function syncProviderLogin(provider) {
   const providerLabel = provider === "apple" ? "Apple" : "Google";
+  if (provider === "apple" && !APPLE_LOGIN_ENABLED) {
+    setSyncFeedback("Apple sign-in is coming soon. Use Google for sync right now.", "warn");
+    return;
+  }
   if (!requireSyncReady(`${providerLabel} login`)) return;
   try {
     const client = await getSupabaseClient();
