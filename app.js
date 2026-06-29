@@ -3973,11 +3973,50 @@ function addCapture(event) {
   renderCaptureFollowups();
 }
 
+function normalizeBrainDumpFragment(entry) {
+  return String(entry || "")
+    .replace(/^[-*#>0-9.)\s]+/, "")
+    .replace(/^(?:and|also|then|plus|but)\s+/i, "")
+    .replace(/^(?:i\s+)?(?:need|needs|have|got|want|wanna|should|must)\s+to\s+/i, "")
+    .replace(/^(?:i\s+)?(?:need|needs|have|got)\s+/i, "")
+    .replace(/^(?:remember|remind me|don't forget|try)\s+to\s+/i, "")
+    .replace(/^(?:maybe|probably|possibly)\s+/i, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.,:!?]+$/g, "")
+    .trim();
+}
+
+function brainDumpLooksActionable(entry) {
+  const text = normalizeBrainDumpFragment(entry);
+  if (text.length < 3 || !/[a-z0-9]/i.test(text)) return false;
+  if (/^(?:and|also|then|plus|maybe|stuff|things|todo|to do)$/i.test(text)) return false;
+  return true;
+}
+
+function splitBrainDumpSegment(segment) {
+  const normalized = normalizeBrainDumpFragment(segment);
+  if (!normalized) return [];
+  return normalized
+    .split(/\s*(?:,|\/|\+)\s+|\s+(?:and|also|then|plus|&)\s+/i)
+    .map(normalizeBrainDumpFragment)
+    .filter(brainDumpLooksActionable);
+}
+
 function splitBrainDump(text) {
-  return String(text || "")
-    .split(/\r?\n|;|(?:\.\s+)/)
-    .map((entry) => entry.replace(/^[-*0-9.)\s]+/, "").trim())
-    .filter((entry) => entry.length >= 3)
+  const seen = new Set();
+  const chunks = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/[\u2022\u00b7]/g, "\n")
+    .split(/\n|;|(?:[.!?]\s+)/);
+
+  return chunks
+    .flatMap(splitBrainDumpSegment)
+    .filter((entry) => {
+      const key = entry.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .slice(0, 20);
 }
 

@@ -79,6 +79,10 @@ function Invoke-QuickChecks {
     Invoke-Git @("diff", "--check")
   }
 
+  Step "Brain dump extraction" {
+    Invoke-Node @("scripts/check-brain-dump.js")
+  }
+
   Step "Required static files" {
     @(
       "index.html",
