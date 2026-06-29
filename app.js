@@ -2831,6 +2831,32 @@ function makeTimelineItem(entry) {
   return button;
 }
 
+function queueChipText(item, reason = "") {
+  if (isCompletedToday(item)) return "Done";
+  if (item.status === "red") return "Urgent";
+  if (item.status === "waiting") return "Waiting";
+  if (reason && reason !== "next active") return reason;
+  if (isRhythm(item)) return "Routine";
+  return item.area === "Unsorted" ? "Today" : item.area;
+}
+
+function timeChipText(item) {
+  const window = timeWindowStatus(item);
+  if (isFocusItem(item)) return focusSessionStateText();
+  if (window.state === "missed") return "Missed";
+  if (window.state === "current") return "Now";
+  if (window.state === "upcoming") return timeWindowMeta(item.timeWindow).shortLabel;
+  if (item.estimate) return `${item.estimate} min`;
+  return formatTimeWindow(item);
+}
+
+function makeCalmChip(label, tone = "") {
+  const chip = document.createElement("span");
+  chip.className = `calm-chip ${tone}`.trim();
+  chip.textContent = label;
+  return chip;
+}
+
 function makeFocusPill(item) {
   const session = activeFocusSession();
   const pill = document.createElement("button");
@@ -3153,28 +3179,21 @@ function renderRecommendation() {
   titleWrap.className = "next-title-wrap";
   const meta = document.createElement("span");
   meta.className = "item-meta";
-  meta.textContent = nextCardMeta(item, top.reason);
+  meta.textContent = isDoing ? "Now" : "Recommended";
   const title = document.createElement("h3");
   title.textContent = item.title;
   const openHint = document.createElement("span");
   openHint.className = "next-open-hint";
-  openHint.textContent = "Open details";
+  openHint.textContent = currentTinyStep(item);
   titleWrap.append(meta, title, openHint);
   main.append(icon, titleWrap);
 
-  const doneSteps = item.steps.filter((step) => step.done).length;
-  const timeText = session ? focusSessionStateText(session) : isRhythm(item)
-    ? `${item.estimate} min minimum / ${cadenceMeta(item.cadence).label}${item.lastDone ? ` / last done ${formatDate(item.lastDone)}` : ""}`
-    : `${item.estimate} min / ${doneSteps} of ${item.steps.length || 1} steps`;
-  const whyText = recommendationWhyText(item, top.reason);
-  const detailGrid = document.createElement("div");
-  detailGrid.className = "next-detail-grid";
-  const timeDetail = makeNextDetail("Time", timeText, "time");
-  if (session) timeDetail.querySelector("strong").dataset.focusRemaining = item.id;
-  detailGrid.append(
-    makeNextDetail("Why", whyText, "why"),
-    makeNextDetail("Tiny start", currentTinyStep(item), "tiny"),
-    timeDetail
+  const chipRow = document.createElement("div");
+  chipRow.className = "calm-chip-row";
+  chipRow.append(
+    makeCalmChip(queueChipText(item, top.reason), item.status === "red" ? "urgent" : item.status === "waiting" ? "waiting" : ""),
+    makeCalmChip(timeChipText(item), "time"),
+    makeCalmChip(item.area === "Unsorted" ? "Today" : item.area, "area")
   );
 
   const progress = document.createElement("div");
@@ -3189,30 +3208,20 @@ function renderRecommendation() {
   if (session) {
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
     actions.append(createButton(session.running ? "Pause" : "Resume", "secondary-button action-button", pauseFocusSession));
-    actions.append(createButton(isProject(item) ? "Stuck" : "Timer", "secondary-button action-button", () => {
-      if (isProject(item)) openStuck(item.id);
-      else openFocusDialog();
-    }));
+    actions.append(createButton("Timer", "secondary-button action-button", openFocusDialog));
   } else if (item.status === "now") {
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
-    actions.append(createButton("Start timer", "secondary-button action-button", () => openFocusSetup(item.id)));
-    actions.append(createButton(isProject(item) ? "Stuck" : "Details", "secondary-button action-button", () => {
-      if (isProject(item)) openStuck(item.id);
-      else openDetail(item.id);
-    }));
-  } else {
-    actions.append(createButton("Start doing", "primary-button action-button", () => startDoingItem(item.id)));
     actions.append(createButton("Timer", "secondary-button action-button", () => openFocusSetup(item.id)));
-    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button action-button", () => completeTodayAction(item.id)));
-    actions.append(createButton(isProject(item) ? "Stuck" : "Details", "secondary-button action-button", () => {
-      if (isProject(item)) openStuck(item.id);
-      else openDetail(item.id);
-    }));
+    actions.append(createButton("Details", "ghost-button action-button", () => openDetail(item.id)));
+  } else {
+    actions.append(createButton("Start", "primary-button action-button", () => startDoingItem(item.id)));
+    actions.append(createButton("Timer", "secondary-button action-button", () => openFocusSetup(item.id)));
+    actions.append(createButton("Details", "ghost-button action-button", () => openDetail(item.id)));
   }
 
-  body.append(main, detailGrid, progress);
+  body.append(main, chipRow, progress);
   if (isFocusItem(item)) body.append(makeFocusPill(item));
-  body.append(actions, makeSnoozeChoices(item.id));
+  body.append(actions);
   panel.append(band, body);
   els.recommendationPanel.append(panel);
   if (els.todayQueueList) {
@@ -3308,21 +3317,22 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
   openButton.className = "queue-open";
   openButton.addEventListener("click", () => openDetail(item.id));
 
-  const rank = document.createElement("span");
-  rank.className = "queue-rank";
-  rank.textContent = doneToday ? "OK" : String(index);
+  const glyph = document.createElement("span");
+  glyph.className = "queue-rank";
+  glyph.textContent = doneToday ? "OK" : itemGlyph(item);
 
   const copy = document.createElement("span");
   copy.className = "queue-copy";
   const title = document.createElement("strong");
   title.textContent = item.title;
-  const detail = document.createElement("span");
-  detail.textContent = doneToday ? "Done today" : currentTinyStep(item);
-  copy.append(title, detail);
+  copy.append(title);
 
   const meta = document.createElement("span");
   meta.className = "queue-meta";
-  meta.textContent = [isCurrent ? "Next" : "", todayReasonText(item, entry.reason), formatTimeWindow(item), doneToday ? "" : `${item.estimate} min`].filter(Boolean).join(" / ");
+  meta.replaceChildren(
+    makeCalmChip(doneToday ? "Done" : isCurrent ? "Now" : queueChipText(item, entry.reason), item.status === "red" ? "urgent" : ""),
+    makeCalmChip(doneToday ? "Today" : timeChipText(item), "time")
+  );
 
   const actions = document.createElement("div");
   actions.className = "queue-row-actions";
@@ -3338,21 +3348,14 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
     const doingButton = document.createElement("button");
     doingButton.type = "button";
     doingButton.className = "queue-action-button queue-doing-button";
-    doingButton.textContent = item.status === "now" ? "Doing" : "Do";
+    doingButton.textContent = item.status === "now" ? "Doing" : "Start";
     doingButton.disabled = item.status === "now";
     doingButton.setAttribute("aria-label", `Make ${item.title} the Doing item`);
     doingButton.addEventListener("click", () => startDoingItem(item.id));
-
-    const doneButton = document.createElement("button");
-    doneButton.type = "button";
-    doneButton.className = "queue-action-button queue-done-button";
-    doneButton.textContent = "Done";
-    doneButton.setAttribute("aria-label", `Mark ${item.title} done`);
-    doneButton.addEventListener("click", () => completeTodayAction(item.id, "all"));
-    actions.append(doingButton, doneButton);
+    actions.append(doingButton);
   }
 
-  openButton.append(rank, copy, meta);
+  openButton.append(glyph, copy, meta);
   row.append(openButton, actions);
   return row;
 }

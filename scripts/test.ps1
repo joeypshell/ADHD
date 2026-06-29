@@ -169,7 +169,7 @@ function Invoke-VisualChecks {
       "timelineBucket",
       "itemTone",
       "itemGlyph",
-      "queue-done-button",
+      "queue-doing-button",
       "focus-pill"
     ) | ForEach-Object { Assert-Contains "app.js" $_ }
 
