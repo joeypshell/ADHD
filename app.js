@@ -1,7 +1,8 @@
 const STORAGE_KEY = "life-command-center-v2";
 const LEGACY_STORAGE_KEY = "life-command-center-v1";
 const SUPABASE_JS_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-const MAGIC_LINK_COOLDOWN_MS = 60 * 60 * 1000;
+const MAGIC_LINK_EMAIL_COOLDOWN_MS = 60 * 1000;
+const MAGIC_LINK_RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000;
 
 const AREAS = [
   "Work",
@@ -513,6 +514,8 @@ function createSyncState() {
     lastSyncedServerUpdatedAt: "",
     lastSessionCheckedAt: "",
     lastLoginLinkSentAt: "",
+    lastLoginLinkEmail: "",
+    lastLoginRateLimitedAt: "",
     userId: "",
     userEmail: "",
     status: "off",
@@ -531,6 +534,8 @@ function normalizeSyncState(sync = {}) {
     lastSyncedServerUpdatedAt: sync.lastSyncedServerUpdatedAt || "",
     lastSessionCheckedAt: sync.lastSessionCheckedAt || "",
     lastLoginLinkSentAt: sync.lastLoginLinkSentAt || "",
+    lastLoginLinkEmail: sync.lastLoginLinkEmail || "",
+    lastLoginRateLimitedAt: sync.lastLoginRateLimitedAt || "",
     userId: sync.userId || "",
     userEmail: sync.userEmail || "",
     status: sync.status || "off",
@@ -4341,10 +4346,27 @@ function syncStatusInfo() {
   };
 }
 
-function loginLinkCooldownRemaining() {
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function loginRateLimitCooldownRemaining() {
+  const limited = toDate(state.sync?.lastLoginRateLimitedAt);
+  if (!limited) return 0;
+  return Math.max(0, MAGIC_LINK_RATE_LIMIT_COOLDOWN_MS - (Date.now() - limited.getTime()));
+}
+
+function loginEmailCooldownRemaining(email = syncEmailValue()) {
+  const targetEmail = normalizeEmail(email);
+  const lastEmail = normalizeEmail(state.sync?.lastLoginLinkEmail);
+  if (!targetEmail || !lastEmail || targetEmail !== lastEmail) return 0;
   const sent = toDate(state.sync?.lastLoginLinkSentAt);
   if (!sent) return 0;
-  return Math.max(0, MAGIC_LINK_COOLDOWN_MS - (Date.now() - sent.getTime()));
+  return Math.max(0, MAGIC_LINK_EMAIL_COOLDOWN_MS - (Date.now() - sent.getTime()));
+}
+
+function loginLinkCooldownRemaining(email = syncEmailValue()) {
+  return Math.max(loginRateLimitCooldownRemaining(), loginEmailCooldownRemaining(email));
 }
 
 function formatCooldown(ms) {
@@ -4360,15 +4382,20 @@ function formatCooldown(ms) {
 }
 
 function syncLoginCooldownText() {
-  const remaining = loginLinkCooldownRemaining();
-  return remaining ? `Try email again in ${formatCooldown(remaining)}` : "Send login link";
+  const rateLimitRemaining = loginRateLimitCooldownRemaining();
+  if (rateLimitRemaining) return `Email quota in ${formatCooldown(rateLimitRemaining)}`;
+  const emailRemaining = loginEmailCooldownRemaining();
+  return emailRemaining ? `Try this email in ${formatCooldown(emailRemaining)}` : "Send login link";
 }
 
-function startLoginLinkCooldown() {
+function startLoginLinkCooldown(email, options = {}) {
   const previousLastSaved = state.lastSaved || "";
+  const now = new Date().toISOString();
   state.sync = normalizeSyncState({
     ...state.sync,
-    lastLoginLinkSentAt: new Date().toISOString(),
+    lastLoginLinkSentAt: now,
+    lastLoginLinkEmail: normalizeEmail(email),
+    lastLoginRateLimitedAt: options.rateLimited ? now : state.sync?.lastLoginRateLimitedAt || "",
     lastError: ""
   });
   saveState({ lastSaved: previousLastSaved });
@@ -4523,15 +4550,15 @@ async function restoreSyncSession() {
 
 async function syncLogin() {
   if (!requireSyncReady("Login")) return;
-  const cooldown = loginLinkCooldownRemaining();
-  if (cooldown) {
-    setSyncFeedback(`Email login is cooling down. Try again in ${formatCooldown(cooldown)}.`, "warn");
-    renderSyncStatus();
-    return;
-  }
   const email = syncEmailValue();
   if (!email) {
     setSyncFeedback("Enter your email first, then send the login link.", "warn");
+    return;
+  }
+  const cooldown = loginLinkCooldownRemaining(email);
+  if (cooldown) {
+    setSyncFeedback(`Email login is cooling down. Try again in ${formatCooldown(cooldown)}.`, "warn");
+    renderSyncStatus();
     return;
   }
   els.syncLoginButton.disabled = true;
@@ -4547,10 +4574,10 @@ async function syncLogin() {
       options: { emailRedirectTo: syncRedirectUrl() }
     });
     if (error) throw error;
-    startLoginLinkCooldown();
-    setSyncFeedback("Login link sent. Open it on this same device/browser, then come back and press Sync now. Email resend is cooling down.", "ok");
+    startLoginLinkCooldown(email);
+    setSyncFeedback("Login link sent. Open it on this same device/browser, then come back and press Sync now. This email has a short resend cooldown.", "ok");
   } catch (error) {
-    if (String(error.message || "").toLowerCase().includes("rate limit")) startLoginLinkCooldown();
+    if (String(error.message || "").toLowerCase().includes("rate limit")) startLoginLinkCooldown(email, { rateLimited: true });
     else renderSyncStatus();
     setSyncFeedback(`Login failed: ${error.message || "Supabase could not send the link."}`, "warn");
   }
@@ -4953,6 +4980,7 @@ function bindEvents() {
   els.closeBackupButton.addEventListener("click", () => els.backupDialog.close());
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
+  els.syncEmail.addEventListener("input", renderSyncStatus);
   els.syncLoginButton.addEventListener("click", syncLogin);
   els.syncGoogleButton.addEventListener("click", () => syncProviderLogin("google"));
   els.syncAppleButton.addEventListener("click", () => syncProviderLogin("apple"));
