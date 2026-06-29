@@ -388,6 +388,59 @@ textarea {
   margin-bottom: 14px;
 }
 
+.today-timeline-shell {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.timeline-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 11px 14px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.timeline-summary::-webkit-details-marker {
+  display: none;
+}
+
+.timeline-summary h2 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.12;
+}
+
+.timeline-summary span {
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 950;
+}
+
+.today-timeline-shell[open] .timeline-summary {
+  margin-bottom: 9px;
+  background: #fff;
+}
+
+.today-timeline-shell[open] .timeline-summary span {
+  visibility: hidden;
+  position: relative;
+}
+
+.today-timeline-shell[open] .timeline-summary span::after {
+  position: absolute;
+  right: 0;
+  visibility: visible;
+  content: "Hide";
+}
+
 .focus-anchor,
 .checkin-shell {
   width: min(860px, 100%);
@@ -873,7 +926,26 @@ textarea {
 
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.template-group {
+  display: grid;
+  gap: 7px;
+}
+
+.template-group h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.template-group-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1786,6 +1858,46 @@ textarea {
 .today-summary-card.done,
 .today-summary-card.clear {
   background: color-mix(in srgb, var(--green-soft) 32%, #fff);
+}
+
+.completion-notice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--green-soft) 48%, #fff);
+  border: 1px solid color-mix(in srgb, var(--green) 24%, var(--line));
+  border-radius: 16px;
+}
+
+.completion-notice div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.completion-notice strong {
+  font-size: 0.9rem;
+  line-height: 1.18;
+}
+
+.completion-notice span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.completion-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: end;
 }
 
 .today-timeline > .empty-state {
@@ -2901,7 +3013,7 @@ dialog::backdrop {
     grid-template-columns: 1fr;
   }
 
-  .template-grid {
+  .template-group-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -3146,7 +3258,7 @@ dialog::backdrop {
     text-align: left;
   }
 
-  .template-grid {
+  .template-group-grid {
     grid-template-columns: 1fr;
   }
 

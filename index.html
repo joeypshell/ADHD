@@ -93,15 +93,16 @@
             <div class="today-queue-list" id="todayQueueList"></div>
           </section>
 
-          <section class="today-timeline-shell" aria-labelledby="todayTimelineTitle">
-            <div class="section-heading compact">
+          <details class="today-timeline-shell" aria-labelledby="todayTimelineTitle">
+            <summary class="timeline-summary">
               <div>
                 <p class="eyebrow">Day shape</p>
                 <h2 id="todayTimelineTitle">Timeline</h2>
               </div>
-            </div>
+              <span>Show</span>
+            </summary>
             <div class="today-timeline" id="todayTimeline"></div>
-          </section>
+          </details>
 
           <form class="quick-capture" id="quickCaptureForm">
             <label class="sr-only" for="quickCaptureInput">Capture a loose thing</label>

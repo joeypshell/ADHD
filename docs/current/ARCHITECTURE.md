@@ -142,8 +142,8 @@ Today:
 - sticky focus anchor when a Doing timer is active
 - recommendation card
 - compact summary strip for remaining / now / missed-or-later / done
-- compact visual timeline: Now / Next / Later / Missed / Done
-- complete Today list with direct Doing, Done, and same-day Undo actions
+- optional visual timeline: Now / Next / Later / Missed / Done
+- complete Today list with direct Doing, Done, snapshot Undo confirmation, and same-day row Undo actions
 - item detail cockpit with why-today, context, next visible step, steps, Do/Done/Snooze/Stuck/Edit
 - quick capture with browser voice fill-in and a tiny-start follow-up
 
@@ -152,8 +152,8 @@ Doing and timers are intentionally separate. `status: "now"` means the item is b
 Add:
 
 - quick capture with generated tiny starts, browser voice fill-in, and an optional clarification follow-up
-- rule-based brain-dump triage with inferred area, time window, cadence, and tiny start
-- templates for recurring life rails and common rescue projects
+- rule-based brain-dump triage with inferred area, time window, cadence, tiny start, and Today/Later/Rhythm save intent
+- grouped templates for recurring life rails and common rescue projects
 - first-run life rail starter for Body, House, Food, Admin, and Work anchors
 - wizard for project, rhythm, or rescue
 
@@ -222,7 +222,9 @@ The Add view includes a rule-based brain dump flow:
 
 - split pasted text into candidate tasks
 - infer Project / Rhythm / Rescue / Later
+- default rescue/current items into Today, rhythms into recurring rails, and later items away from Today
 - suggest tiny starts
+- show the save intent on each candidate before confirmation
 - require user confirmation before saving
 
 No AI is involved in this flow yet.

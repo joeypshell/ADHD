@@ -273,6 +273,15 @@ const LIFE_RAIL_STARTERS = [
   { id: "work", label: "Work", templateIds: ["work-checkin", "work-closeout"] }
 ];
 
+const TEMPLATE_GROUPS = [
+  { id: "body", label: "Body", templateIds: ["workout"] },
+  { id: "house", label: "House", templateIds: ["dishes", "cleaning-reset", "laundry", "trash"] },
+  { id: "food", label: "Food", templateIds: ["dinner"] },
+  { id: "admin", label: "Admin + medical", templateIds: ["gas", "meds-admin", "admin-appointment"] },
+  { id: "work", label: "Work", templateIds: ["work-checkin", "work-closeout", "work-task"] },
+  { id: "rescue", label: "Rescue", templateIds: ["scary-overdue"] }
+];
+
 const DEFAULT_RHYTHMS = [];
 
 const STARTER_RHYTHM_TITLES = new Set([
@@ -361,6 +370,7 @@ let addMode = "capture";
 let focusTimerId = 0;
 let brainDumpCandidates = [];
 let captureFollowupItemId = "";
+let completionNotice = null;
 let voiceRecognition = null;
 let supabaseClientPromise = null;
 let syncChoiceContext = null;
@@ -1933,6 +1943,38 @@ function completeItem(itemId) {
   });
 }
 
+function cloneItemSnapshot(item) {
+  return JSON.parse(JSON.stringify(item));
+}
+
+function completionMessage(item, action = "step") {
+  if (isRhythm(item)) return "Rhythm marked done for today.";
+  if (action === "all") return "Task marked done.";
+  return "Step marked done.";
+}
+
+function rememberCompletion(before, action = "step") {
+  if (!before) return;
+  completionNotice = {
+    itemId: before.id,
+    title: before.title,
+    message: completionMessage(before, action),
+    snapshot: cloneItemSnapshot(before),
+    createdAt: Date.now()
+  };
+}
+
+function completeTodayAction(itemId, action = "step") {
+  const item = getItem(itemId);
+  if (!item) return;
+  const before = cloneItemSnapshot(item);
+  if (isRhythm(item)) completeRhythm(itemId);
+  else if (action === "all") completeItem(itemId);
+  else completeCurrentStep(itemId);
+  rememberCompletion(before, action);
+  render();
+}
+
 function markRhythmDone(item) {
   const now = new Date().toISOString();
   item.lastDone = todayIso();
@@ -1957,6 +1999,7 @@ function completeRhythm(itemId) {
 function undoCompleteItem(itemId) {
   const item = getItem(itemId);
   if (!item) return;
+  if (completionNotice?.itemId === itemId) completionNotice = null;
   const now = new Date().toISOString();
   clearFocusForItem(itemId);
   if (isRhythm(item)) {
@@ -1982,6 +2025,17 @@ function undoCompleteItem(itemId) {
   item.lastTouched = now;
   saveState();
   render();
+}
+
+function restoreCompletionSnapshot() {
+  if (!completionNotice?.snapshot) return;
+  const snapshot = cloneItemSnapshot(completionNotice.snapshot);
+  state.items = state.items.map((item) => (item.id === snapshot.id ? snapshot : item));
+  completionNotice = null;
+  saveState();
+  render();
+  showView("now");
+  openDetail(snapshot.id);
 }
 
 function isRhythm(item) {
@@ -2759,7 +2813,19 @@ function templateMode(template) {
 function renderTemplates() {
   if (!els.templateGrid) return;
   els.templateGrid.replaceChildren();
-  STARTER_TEMPLATES.forEach((template) => els.templateGrid.append(makeTemplateCard(template)));
+  TEMPLATE_GROUPS.forEach((group) => {
+    const templates = group.templateIds.map(templateById).filter(Boolean);
+    if (!templates.length) return;
+    const section = document.createElement("section");
+    section.className = "template-group";
+    const heading = document.createElement("h3");
+    heading.textContent = group.label;
+    const grid = document.createElement("div");
+    grid.className = "template-group-grid";
+    templates.forEach((template) => grid.append(makeTemplateCard(template)));
+    section.append(heading, grid);
+    els.templateGrid.append(section);
+  });
 }
 
 function templateById(id) {
@@ -3033,14 +3099,14 @@ function renderRecommendation() {
   const actions = document.createElement("div");
   actions.className = "now-actions";
   if (session) {
-    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeCurrentStep(item.id)));
+    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
     actions.append(createButton(session.running ? "Pause" : "Resume", "secondary-button action-button", pauseFocusSession));
     actions.append(createButton(isProject(item) ? "Stuck" : "Timer", "secondary-button action-button", () => {
       if (isProject(item)) openStuck(item.id);
       else openFocusDialog();
     }));
   } else if (item.status === "now") {
-    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeCurrentStep(item.id)));
+    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
     actions.append(createButton("Start timer", "secondary-button action-button", () => startFocusSession(item.id)));
     actions.append(createButton(isProject(item) ? "Stuck" : "Details", "secondary-button action-button", () => {
       if (isProject(item)) openStuck(item.id);
@@ -3049,7 +3115,7 @@ function renderRecommendation() {
   } else {
     actions.append(createButton("Start doing", "primary-button action-button", () => startDoingItem(item.id)));
     actions.append(createButton("Timer", "secondary-button action-button", () => startFocusSession(item.id)));
-    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button action-button", () => completeCurrentStep(item.id)));
+    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button action-button", () => completeTodayAction(item.id)));
     actions.append(createButton(isProject(item) ? "Stuck" : "Details", "secondary-button action-button", () => {
       if (isProject(item)) openStuck(item.id);
       else openDetail(item.id);
@@ -3077,6 +3143,8 @@ function todayQueueGroup(entry, topItemId = "") {
 function renderTodayQueueList(entries, topItemId = "") {
   if (!els.todayQueueList) return;
   els.todayQueueList.replaceChildren();
+  const notice = makeCompletionNotice();
+  if (notice) els.todayQueueList.append(notice);
   const groups = [
     { id: "now", label: "Now" },
     { id: "next", label: "Next" },
@@ -3109,6 +3177,37 @@ function renderTodayQueueList(entries, topItemId = "") {
     section.append(heading, list);
     els.todayQueueList.append(section);
   });
+}
+
+function makeCompletionNotice() {
+  if (!completionNotice) return null;
+  if (Date.now() - Number(completionNotice.createdAt || 0) > 5 * 60 * 1000) {
+    completionNotice = null;
+    return null;
+  }
+  const card = document.createElement("section");
+  card.className = "completion-notice";
+  card.setAttribute("aria-live", "polite");
+
+  const copy = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = completionNotice.message || "Done.";
+  const detail = document.createElement("span");
+  detail.textContent = completionNotice.title;
+  copy.append(title, detail);
+
+  const actions = document.createElement("div");
+  actions.className = "completion-notice-actions";
+  actions.append(
+    createButton("Undo", "secondary-button small-button", restoreCompletionSnapshot),
+    createButton("OK", "ghost-button small-button", () => {
+      completionNotice = null;
+      render();
+    })
+  );
+
+  card.append(copy, actions);
+  return card;
 }
 
 function makeTodayQueueRow(entry, index, isCurrent = false) {
@@ -3163,7 +3262,7 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
     doneButton.className = "queue-action-button queue-done-button";
     doneButton.textContent = "Done";
     doneButton.setAttribute("aria-label", `Mark ${item.title} done`);
-    doneButton.addEventListener("click", () => completeItem(item.id));
+    doneButton.addEventListener("click", () => completeTodayAction(item.id, "all"));
     actions.append(doingButton, doneButton);
   }
 
@@ -3845,19 +3944,76 @@ function suggestedTinyStart(text, kind) {
   return "Define the next visible action";
 }
 
+function brainCandidateDefaults(text, kind = inferBrainKind(text)) {
+  return {
+    kind,
+    area: inferBrainArea(text, kind),
+    timeWindow: kind === "later" ? "anytime" : inferBrainTimeWindow(text),
+    cadence: kind === "rhythm" ? inferBrainCadence(text) : "",
+    tiny: suggestedTinyStart(text, kind)
+  };
+}
+
+function brainCandidateIntent(candidate) {
+  const labels = {
+    rescue: "Today rescue",
+    rhythm: "Recurring rail",
+    later: "Saved for later",
+    project: "Today project"
+  };
+  return labels[candidate.kind] || "Today project";
+}
+
+function brainCandidateSchedule(candidate) {
+  const kind = candidate.kind === "rhythm" ? "rhythm" : "project";
+  if (candidate.kind === "later") {
+    return {
+      kind,
+      status: "later",
+      due: "",
+      review: dateOffset(7),
+      plannedFor: "",
+      nextDue: ""
+    };
+  }
+  if (candidate.kind === "rhythm") {
+    return {
+      kind,
+      status: "active",
+      due: "",
+      review: "",
+      plannedFor: "",
+      nextDue: todayIso()
+    };
+  }
+  if (candidate.kind === "rescue") {
+    return {
+      kind,
+      status: "red",
+      due: todayIso(),
+      review: todayIso(),
+      plannedFor: todayIso(),
+      nextDue: ""
+    };
+  }
+  return {
+    kind,
+    status: "active",
+    due: "",
+    review: todayIso(),
+    plannedFor: todayIso(),
+    nextDue: ""
+  };
+}
+
 function extractBrainDump() {
   const lines = splitBrainDump(els.brainDumpInput.value);
   brainDumpCandidates = lines.map((text) => {
-    const kind = inferBrainKind(text);
     return {
       id: cryptoId(),
       selected: true,
       title: text,
-      kind,
-      area: inferBrainArea(text, kind),
-      timeWindow: inferBrainTimeWindow(text),
-      cadence: inferBrainCadence(text),
-      tiny: suggestedTinyStart(text, kind)
+      ...brainCandidateDefaults(text)
     };
   });
   renderBrainDumpCandidates();
@@ -3867,7 +4023,13 @@ function updateBrainCandidate(id, patch) {
   brainDumpCandidates = brainDumpCandidates.map((candidate) => {
     if (candidate.id !== id) return candidate;
     const next = { ...candidate, ...patch };
-    if (patch.kind && !patch.tiny) next.tiny = suggestedTinyStart(next.title, next.kind);
+    if (patch.kind) {
+      const defaults = brainCandidateDefaults(next.title, next.kind);
+      next.area = defaults.area;
+      next.timeWindow = defaults.timeWindow;
+      next.cadence = defaults.cadence;
+      next.tiny = defaults.tiny;
+    }
     return next;
   });
   renderBrainDumpCandidates();
@@ -3909,7 +4071,12 @@ function renderBrainDumpCandidates() {
 
     const meta = document.createElement("small");
     meta.className = "brain-candidate-meta";
-    meta.textContent = [candidate.area, timeWindowMeta(candidate.timeWindow).label, candidate.kind === "rhythm" ? cadenceMeta(candidate.cadence).label : ""].filter(Boolean).join(" / ");
+    meta.textContent = [
+      brainCandidateIntent(candidate),
+      candidate.area,
+      timeWindowMeta(candidate.timeWindow).label,
+      candidate.kind === "rhythm" ? cadenceMeta(candidate.cadence).label : ""
+    ].filter(Boolean).join(" / ");
 
     const tiny = document.createElement("input");
     tiny.value = candidate.tiny;
@@ -3928,24 +4095,27 @@ function renderBrainDumpCandidates() {
 function saveBrainDumpCandidates() {
   const selected = brainDumpCandidates.filter((candidate) => candidate.selected && candidate.title.trim());
   selected.forEach((candidate) => {
-    const kind = candidate.kind === "rhythm" ? "rhythm" : "project";
-    const status = candidate.kind === "rescue" ? "red" : candidate.kind === "later" ? "later" : kind === "rhythm" ? "active" : "active";
+    const schedule = brainCandidateSchedule(candidate);
+    const tinyStart = candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind);
     addItem({
       title: candidate.title.trim(),
-      kind,
-      status,
+      kind: schedule.kind,
+      status: schedule.status,
       mode: dashboardMode(),
       area: candidate.area || inferBrainArea(candidate.title, candidate.kind),
-      cadence: kind === "rhythm" ? candidate.cadence || inferBrainCadence(candidate.title) : "",
-      nextDue: kind === "rhythm" ? todayIso() : "",
+      due: schedule.due,
+      review: schedule.review,
+      plannedFor: schedule.plannedFor,
+      cadence: schedule.kind === "rhythm" ? candidate.cadence || inferBrainCadence(candidate.title) : "",
+      nextDue: schedule.nextDue,
       timeWindow: candidate.timeWindow || inferBrainTimeWindow(candidate.title),
-      nextAction: candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind),
-      minimum: kind === "rhythm" ? candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind) : "",
+      nextAction: tinyStart,
+      minimum: schedule.kind === "rhythm" ? tinyStart : "",
       consequence: candidate.kind === "rescue" ? "Rescue this before it grows" : "",
       estimate: candidate.kind === "rescue" ? 10 : 15,
       importance: candidate.kind === "rescue" ? 5 : 3,
       dread: candidate.kind === "rescue" ? 5 : 3,
-      steps: [candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind)]
+      steps: [tinyStart]
     });
   });
   brainDumpCandidates = [];
@@ -4064,7 +4234,7 @@ function renderDetail(item) {
     }));
   }
   actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button", () => {
-    completeCurrentStep(item.id);
+    completeTodayAction(item.id);
     els.detailDialog.close();
   }));
   if (isProject(item)) {
@@ -4398,7 +4568,7 @@ function completeFocusSession() {
   const itemId = session.itemId;
   state.focusSession = null;
   saveState();
-  completeCurrentStep(itemId);
+  completeTodayAction(itemId);
   if (els.focusDialog.open) els.focusDialog.close();
   syncFocusTimer();
 }
