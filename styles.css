@@ -2906,6 +2906,61 @@ dialog::backdrop {
   gap: 16px;
 }
 
+.focus-setup {
+  display: grid;
+  gap: 14px;
+}
+
+.focus-setup[hidden] {
+  display: none;
+}
+
+.focus-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.focus-choice-grid-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.focus-choice {
+  display: grid;
+  gap: 3px;
+  min-height: 58px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 850;
+  text-align: left;
+}
+
+.focus-choice strong,
+.focus-choice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.focus-choice span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.focus-choice.is-selected {
+  color: #fff;
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+.focus-choice.is-selected span {
+  color: rgba(255, 255, 255, 0.82);
+}
+
 .focus-timer-shell {
   display: grid;
   gap: 12px;

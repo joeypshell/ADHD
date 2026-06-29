@@ -6,6 +6,19 @@ const MAGIC_LINK_RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000;
 const AUTO_SYNC_DEBOUNCE_MS = 2500;
 const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 const APPLE_LOGIN_ENABLED = false;
+const POMODORO_PRESETS = [
+  { id: "classic", label: "25 + 5", workMinutes: 25, breakMinutes: 5 },
+  { id: "short", label: "15 + 3", workMinutes: 15, breakMinutes: 3 },
+  { id: "deep", label: "45 + 10", workMinutes: 45, breakMinutes: 10 },
+  { id: "tiny", label: "10 + 2", workMinutes: 10, breakMinutes: 2 }
+];
+const BUILDUP_OPTIONS = [
+  { id: "none", label: "None", seconds: 0 },
+  { id: "30s", label: "30 sec", seconds: 30 },
+  { id: "1m", label: "1 min", seconds: 60 },
+  { id: "2m", label: "2 min", seconds: 120 },
+  { id: "5m", label: "5 min", seconds: 300 }
+];
 
 const AREAS = [
   "Work",
@@ -371,6 +384,9 @@ let wizard = createWizardState("project");
 let emptyWizardAutoOpened = false;
 let addMode = "capture";
 let focusTimerId = 0;
+let focusSetupItemId = "";
+let selectedPomodoroPresetId = "classic";
+let selectedBuildUpId = "none";
 let brainDumpCandidates = [];
 let captureFollowupItemId = "";
 let todayNotice = null;
@@ -522,6 +538,10 @@ const els = {
   focusDialog: document.querySelector("#focusDialog"),
   focusMeta: document.querySelector("#focusMeta"),
   focusTitle: document.querySelector("#focusTitle"),
+  focusSetup: document.querySelector("#focusSetup"),
+  focusPresetChoices: document.querySelector("#focusPresetChoices"),
+  focusBuildChoices: document.querySelector("#focusBuildChoices"),
+  focusStartButton: document.querySelector("#focusStartButton"),
   focusStateLabel: document.querySelector("#focusStateLabel"),
   focusTime: document.querySelector("#focusTime"),
   focusProgressBar: document.querySelector("#focusProgressBar"),
@@ -1062,12 +1082,29 @@ function normalizeFocusSession(session = null) {
   const startedAt = session.startedAt && toDate(session.startedAt) ? session.startedAt : "";
   const endsAt = session.endsAt && toDate(session.endsAt) ? session.endsAt : "";
   if (!itemId || !startedAt || !endsAt) return null;
+  const phase = ["build", "work", "break", "done"].includes(session.phase) ? session.phase : "work";
+  const presetId = POMODORO_PRESETS.some((preset) => preset.id === session.presetId) ? session.presetId : "custom";
+  const workMinutes = clampNumber(session.workMinutes || session.durationMinutes, 1, 180, 10);
+  const breakMinutes = clampNumber(session.breakMinutes, 1, 60, 5);
+  const buildSeconds = clampNumber(session.buildSeconds, 0, 300, 0);
+  const defaultPhaseDurationMs = phase === "build"
+    ? Math.max(1000, buildSeconds * 1000)
+    : phase === "break"
+      ? breakMinutes * 60000
+      : workMinutes * 60000;
 
   return {
     itemId,
     startedAt,
     endsAt,
-    durationMinutes: clampNumber(session.durationMinutes, 1, 180, 10),
+    durationMinutes: clampNumber(session.durationMinutes, 1, 180, workMinutes),
+    mode: session.mode || "pomodoro",
+    presetId,
+    phase,
+    workMinutes,
+    breakMinutes,
+    buildSeconds,
+    phaseDurationMs: Math.max(1000, Number(session.phaseDurationMs || defaultPhaseDurationMs)),
     running: session.running !== false,
     pausedRemainingMs: Math.max(0, Number(session.pausedRemainingMs || 0)),
     alertEnabled: Boolean(session.alertEnabled),
@@ -2126,6 +2163,35 @@ function focusDurationMinutes(item) {
   return clampNumber(item?.estimate, 5, 60, 10);
 }
 
+function pomodoroPresetById(id) {
+  return POMODORO_PRESETS.find((preset) => preset.id === id) || POMODORO_PRESETS[0];
+}
+
+function buildUpOptionById(id) {
+  return BUILDUP_OPTIONS.find((option) => option.id === id) || BUILDUP_OPTIONS[0];
+}
+
+function focusPhaseLabel(session = activeFocusSession()) {
+  if (!session) return "Pomodoro";
+  if (session.phase === "build") return "Build-up";
+  if (session.phase === "break") return sessionRemainingMs(session) <= 0 ? "Break done" : "Break";
+  if (session.phase === "done") return "Break done";
+  return "Work sprint";
+}
+
+function focusPhaseInstruction(item, session = activeFocusSession()) {
+  if (!session) return currentTinyStep(item);
+  if (session.phase === "build") return "Get ready. When this ends, start immediately.";
+  if (session.phase === "break") return sessionRemainingMs(session) <= 0 ? "Break is done. Choose the next tiny step." : "Step away, breathe, reset.";
+  if (session.phase === "done") return "Break is done. Choose the next tiny step.";
+  return currentTinyStep(item);
+}
+
+function focusPhaseDurationMs(session = activeFocusSession()) {
+  if (!session) return 1;
+  return Math.max(1000, Number(session.phaseDurationMs || Number(session.durationMinutes || 10) * 60000));
+}
+
 function sessionRemainingMs(session = activeFocusSession()) {
   if (!session) return 0;
   if (!session.running) return Math.max(0, Number(session.pausedRemainingMs || 0));
@@ -2142,9 +2208,10 @@ function formatCountdown(milliseconds) {
 function focusSessionStateText(session = activeFocusSession()) {
   if (!session) return "Ready";
   const remaining = sessionRemainingMs(session);
-  if (remaining <= 0) return "Time up";
+  if (remaining <= 0) return session.phase === "break" || session.phase === "done" ? "Break done" : "Time up";
   if (!session.running) return "Paused";
-  return `${formatCountdown(remaining)} left`;
+  const prefix = session.phase === "build" ? "Starts in" : session.phase === "break" ? "Break" : "";
+  return prefix ? `${prefix} ${formatCountdown(remaining)}` : `${formatCountdown(remaining)} left`;
 }
 
 function scoreItem(item) {
@@ -3125,14 +3192,14 @@ function renderRecommendation() {
     }));
   } else if (item.status === "now") {
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
-    actions.append(createButton("Start timer", "secondary-button action-button", () => startFocusSession(item.id)));
+    actions.append(createButton("Start timer", "secondary-button action-button", () => openFocusSetup(item.id)));
     actions.append(createButton(isProject(item) ? "Stuck" : "Details", "secondary-button action-button", () => {
       if (isProject(item)) openStuck(item.id);
       else openDetail(item.id);
     }));
   } else {
     actions.append(createButton("Start doing", "primary-button action-button", () => startDoingItem(item.id)));
-    actions.append(createButton("Timer", "secondary-button action-button", () => startFocusSession(item.id)));
+    actions.append(createButton("Timer", "secondary-button action-button", () => openFocusSetup(item.id)));
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button action-button", () => completeTodayAction(item.id)));
     actions.append(createButton(isProject(item) ? "Stuck" : "Details", "secondary-button action-button", () => {
       if (isProject(item)) openStuck(item.id);
@@ -4258,7 +4325,7 @@ function renderDetail(item) {
   if (!isFocusItem(item)) {
     actions.append(createButton("Timer", "secondary-button", () => {
       els.detailDialog.close();
-      startFocusSession(item.id);
+      openFocusSetup(item.id);
     }));
   }
   actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "secondary-button", () => {
@@ -4430,16 +4497,93 @@ function startDoingItem(itemId) {
   syncFocusTimer();
 }
 
+function openFocusSetup(itemId) {
+  const item = getItem(itemId);
+  if (!item) return;
+  focusSetupItemId = itemId;
+  if (!POMODORO_PRESETS.some((preset) => preset.id === selectedPomodoroPresetId)) selectedPomodoroPresetId = "classic";
+  if (!BUILDUP_OPTIONS.some((option) => option.id === selectedBuildUpId)) selectedBuildUpId = "none";
+  renderFocusSetup();
+  if (!els.focusDialog.open) els.focusDialog.showModal();
+}
+
+function renderFocusSetup() {
+  const item = getItem(focusSetupItemId);
+  if (!item || !els.focusSetup) return;
+  els.focusMeta.textContent = itemMeta(item);
+  els.focusTitle.textContent = "Pomodoro";
+  els.focusSetup.hidden = false;
+  els.focusStateLabel.textContent = "Ready";
+  els.focusTime.textContent = pomodoroPresetById(selectedPomodoroPresetId).label;
+  els.focusProgressBar.style.width = "0%";
+  els.focusStep.textContent = currentTinyStep(item);
+  if (els.focusPresetChoices) {
+    els.focusPresetChoices.replaceChildren(...POMODORO_PRESETS.map((preset) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `focus-choice${preset.id === selectedPomodoroPresetId ? " is-selected" : ""}`;
+      button.dataset.focusPreset = preset.id;
+      button.setAttribute("aria-label", `${preset.workMinutes} minute work, ${preset.breakMinutes} minute break`);
+      button.innerHTML = `<strong>${preset.label}</strong><span>${preset.workMinutes} min work / ${preset.breakMinutes} min break</span>`;
+      return button;
+    }));
+  }
+  if (els.focusBuildChoices) {
+    els.focusBuildChoices.replaceChildren(...BUILDUP_OPTIONS.map((option) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `focus-choice${option.id === selectedBuildUpId ? " is-selected" : ""}`;
+      button.dataset.focusBuild = option.id;
+      button.setAttribute("aria-label", option.seconds ? `${option.label} build-up` : "No build-up");
+      button.textContent = option.label;
+      return button;
+    }));
+  }
+  const build = buildUpOptionById(selectedBuildUpId);
+  if (els.focusStartButton) {
+    els.focusStartButton.textContent = build.seconds ? `Start with ${build.label} build-up` : "Start work sprint";
+  }
+  const focusActions = els.focusDoneButton?.closest(".focus-actions");
+  if (focusActions) focusActions.hidden = true;
+  [els.focusDoneButton, els.focusPauseButton, els.focusAddFiveButton, els.focusSnoozeButton, els.focusNotifyButton, els.focusSnoozeChoices].forEach((node) => {
+    if (node) node.hidden = true;
+  });
+}
+
+function beginSelectedPomodoro() {
+  if (!focusSetupItemId) return;
+  const preset = pomodoroPresetById(selectedPomodoroPresetId);
+  const build = buildUpOptionById(selectedBuildUpId);
+  startFocusSession(focusSetupItemId, preset.workMinutes, {
+    openTimer: true,
+    presetId: preset.id,
+    workMinutes: preset.workMinutes,
+    breakMinutes: preset.breakMinutes,
+    buildSeconds: build.seconds
+  });
+}
+
 function startFocusSession(itemId, minutes, options = {}) {
   const item = getItem(itemId);
   if (!item) return;
   const now = new Date();
-  const durationMinutes = clampNumber(minutes, 1, 180, focusDurationMinutes(item));
+  const workMinutes = clampNumber(options.workMinutes || minutes, 1, 180, focusDurationMinutes(item));
+  const breakMinutes = clampNumber(options.breakMinutes, 1, 60, 5);
+  const buildSeconds = clampNumber(options.buildSeconds, 0, 300, 0);
+  const phase = buildSeconds > 0 ? "build" : "work";
+  const phaseDurationMs = phase === "build" ? buildSeconds * 1000 : workMinutes * 60000;
   state.focusSession = {
     itemId,
     startedAt: now.toISOString(),
-    endsAt: new Date(now.getTime() + durationMinutes * 60000).toISOString(),
-    durationMinutes,
+    endsAt: new Date(now.getTime() + phaseDurationMs).toISOString(),
+    durationMinutes: workMinutes,
+    mode: "pomodoro",
+    presetId: options.presetId || "custom",
+    phase,
+    workMinutes,
+    breakMinutes,
+    buildSeconds,
+    phaseDurationMs,
     running: true,
     pausedRemainingMs: 0,
     alertEnabled: state.focusSession?.alertEnabled || false,
@@ -4454,6 +4598,7 @@ function startFocusSession(itemId, minutes, options = {}) {
   saveState();
   render();
   syncFocusTimer();
+  focusSetupItemId = "";
   if (options.openTimer) openFocusDialog();
 }
 
@@ -4483,7 +4628,7 @@ function updateFocusDisplays() {
     return;
   }
   const remaining = sessionRemainingMs(session);
-  const durationMs = Math.max(1, Number(session.durationMinutes || 10) * 60000);
+  const durationMs = focusPhaseDurationMs(session);
   const completePercent = Math.min(100, Math.max(0, ((durationMs - remaining) / durationMs) * 100));
   const timeText = formatCountdown(remaining);
   const stateText = focusSessionStateText(session);
@@ -4494,13 +4639,22 @@ function updateFocusDisplays() {
   renderFocusAnchor();
 
   if (!els.focusDialog.open) return;
+  if (els.focusSetup) els.focusSetup.hidden = true;
+  const focusActions = els.focusDoneButton?.closest(".focus-actions");
+  if (focusActions) focusActions.hidden = false;
   els.focusMeta.textContent = itemMeta(item);
   els.focusTitle.textContent = item.title;
-  els.focusStateLabel.textContent = remaining <= 0 ? "Time is up" : session.running ? "Doing now" : "Paused";
+  els.focusStateLabel.textContent = !session.running && remaining > 0 ? "Paused" : focusPhaseLabel(session);
   els.focusTime.textContent = timeText;
   els.focusProgressBar.style.width = `${completePercent}%`;
-  els.focusStep.textContent = currentTinyStep(item);
-  els.focusDoneButton.textContent = isRhythm(item) ? "Done today" : "Done step";
+  els.focusStep.textContent = focusPhaseInstruction(item, session);
+  els.focusDoneButton.hidden = false;
+  els.focusPauseButton.hidden = false;
+  els.focusAddFiveButton.hidden = false;
+  els.focusSnoozeButton.hidden = false;
+  if (els.focusSnoozeChoices) els.focusSnoozeChoices.hidden = false;
+  const breakPhase = session.phase === "break" || session.phase === "done";
+  els.focusDoneButton.textContent = breakPhase ? "End break" : isRhythm(item) ? "Done today" : "Done step";
   els.focusPauseButton.textContent = session.running ? "Pause" : "Resume";
   if (els.focusSnoozeChoices) {
     els.focusSnoozeChoices.replaceChildren();
@@ -4520,6 +4674,10 @@ function updateFocusDisplays() {
 }
 
 function renderFocusDialog() {
+  if (!activeFocusSession() && focusSetupItemId) {
+    renderFocusSetup();
+    return;
+  }
   updateFocusDisplays();
 }
 
@@ -4531,15 +4689,35 @@ function syncFocusTimer() {
   focusTimerId = window.setInterval(tickFocusSession, 1000);
 }
 
+function sendFocusNotification(title, body) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body });
+  }
+}
+
 function maybeSendFocusAlert(item) {
   const session = activeFocusSession();
   if (!session || !session.alertEnabled || session.notifiedAt) return;
   session.notifiedAt = new Date().toISOString();
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("Focus time is up", {
-      body: item ? item.title : "Check your current step"
-    });
-  }
+  sendFocusNotification("Pomodoro is done", item ? item.title : "Check your current step");
+  saveState();
+}
+
+function moveFocusPhase(phase) {
+  const session = activeFocusSession();
+  if (!session) return;
+  const now = Date.now();
+  const durationMs = phase === "break"
+    ? Math.max(60000, Number(session.breakMinutes || 5) * 60000)
+    : Math.max(60000, Number(session.workMinutes || session.durationMinutes || 10) * 60000);
+  session.phase = phase;
+  session.phaseDurationMs = durationMs;
+  session.durationMinutes = phase === "break" ? session.breakMinutes : session.workMinutes;
+  session.startedAt = new Date(now).toISOString();
+  session.endsAt = new Date(now + durationMs).toISOString();
+  session.pausedRemainingMs = 0;
+  session.running = true;
+  session.notifiedAt = "";
   saveState();
 }
 
@@ -4553,10 +4731,19 @@ function tickFocusSession() {
   const item = getItem(session.itemId);
   const remaining = sessionRemainingMs(session);
   if (remaining <= 0 && session.running) {
-    session.running = false;
-    session.pausedRemainingMs = 0;
-    maybeSendFocusAlert(item);
-    saveState();
+    if (session.phase === "build") {
+      if (session.alertEnabled) sendFocusNotification("Start now", item ? currentTinyStep(item) : "Start the task");
+      moveFocusPhase("work");
+    } else if (session.phase === "work") {
+      if (session.alertEnabled) sendFocusNotification("Work block done", "Break starts now.");
+      moveFocusPhase("break");
+    } else {
+      session.phase = "done";
+      session.running = false;
+      session.pausedRemainingMs = 0;
+      maybeSendFocusAlert(item);
+      saveState();
+    }
   }
   updateFocusDisplays();
 }
@@ -4584,6 +4771,7 @@ function extendFocusSession(minutes = 5) {
   const extraMs = minutes * 60000;
   const remaining = sessionRemainingMs(session);
   session.durationMinutes += minutes;
+  session.phaseDurationMs = focusPhaseDurationMs(session) + extraMs;
   session.endsAt = new Date(Date.now() + remaining + extraMs).toISOString();
   session.pausedRemainingMs = 0;
   session.running = true;
@@ -4596,8 +4784,15 @@ function completeFocusSession() {
   const session = activeFocusSession();
   if (!session) return;
   const itemId = session.itemId;
+  const breakPhase = session.phase === "break" || session.phase === "done";
   state.focusSession = null;
   saveState();
+  if (breakPhase) {
+    render();
+    if (els.focusDialog.open) els.focusDialog.close();
+    syncFocusTimer();
+    return;
+  }
   completeTodayAction(itemId);
   if (els.focusDialog.open) els.focusDialog.close();
   syncFocusTimer();
@@ -5498,7 +5693,26 @@ function bindEvents() {
 
   els.closeEditButton.addEventListener("click", () => els.itemDialog.close());
   els.closeDetailButton.addEventListener("click", () => els.detailDialog.close());
-  els.closeFocusButton.addEventListener("click", () => els.focusDialog.close());
+  els.closeFocusButton.addEventListener("click", () => {
+    focusSetupItemId = "";
+    els.focusDialog.close();
+  });
+  els.focusStartButton.addEventListener("click", beginSelectedPomodoro);
+  els.focusPresetChoices.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-focus-preset]");
+    if (!button) return;
+    selectedPomodoroPresetId = button.dataset.focusPreset;
+    renderFocusSetup();
+  });
+  els.focusBuildChoices.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-focus-build]");
+    if (!button) return;
+    selectedBuildUpId = button.dataset.focusBuild;
+    renderFocusSetup();
+  });
+  els.focusDialog.addEventListener("close", () => {
+    focusSetupItemId = "";
+  });
   els.focusDoneButton.addEventListener("click", completeFocusSession);
   els.focusPauseButton.addEventListener("click", pauseFocusSession);
   els.focusAddFiveButton.addEventListener("click", () => extendFocusSession(5));
