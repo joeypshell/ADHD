@@ -3125,7 +3125,7 @@ function renderRecommendation() {
     const band = document.createElement("div");
     band.className = "next-band";
     const bandLabel = document.createElement("span");
-    bandLabel.textContent = "Automatic queue";
+    bandLabel.textContent = "Now";
     const bandPill = document.createElement("strong");
     bandPill.textContent = modeMeta().label;
     band.append(bandLabel, bandPill);
@@ -3159,14 +3159,17 @@ function renderRecommendation() {
   const band = document.createElement("div");
   band.className = "next-band";
   const bandLabel = document.createElement("span");
-  bandLabel.textContent = isDoing ? "Doing now" : "Recommended next action";
+  bandLabel.textContent = "Now";
   const bandPill = document.createElement("strong");
-  bandPill.textContent = priorityPillText(item, top.reason);
+  bandPill.textContent = isDoing ? "Currently active" : "Focus on one thing";
   if (session) bandPill.dataset.focusRemaining = item.id;
   band.append(bandLabel, bandPill);
 
   const body = document.createElement("div");
   body.className = "next-card-body";
+
+  const taskRow = document.createElement("div");
+  taskRow.className = "now-task-row";
 
   const main = document.createElement("button");
   main.type = "button";
@@ -3184,7 +3187,7 @@ function renderRecommendation() {
   title.textContent = item.title;
   const openHint = document.createElement("span");
   openHint.className = "next-open-hint";
-  openHint.textContent = currentTinyStep(item);
+  openHint.textContent = timeChipText(item);
   titleWrap.append(meta, title, openHint);
   main.append(icon, titleWrap);
 
@@ -3207,21 +3210,15 @@ function renderRecommendation() {
   actions.className = "now-actions";
   if (session) {
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
-    actions.append(createButton(session.running ? "Pause" : "Resume", "secondary-button action-button", pauseFocusSession));
-    actions.append(createButton("Timer", "secondary-button action-button", openFocusDialog));
   } else if (item.status === "now") {
     actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
-    actions.append(createButton("Timer", "secondary-button action-button", () => openFocusSetup(item.id)));
-    actions.append(createButton("Details", "ghost-button action-button", () => openDetail(item.id)));
   } else {
     actions.append(createButton("Start", "primary-button action-button", () => startDoingItem(item.id)));
-    actions.append(createButton("Timer", "secondary-button action-button", () => openFocusSetup(item.id)));
-    actions.append(createButton("Details", "ghost-button action-button", () => openDetail(item.id)));
   }
 
-  body.append(main, chipRow, progress);
+  taskRow.append(main, actions);
+  body.append(taskRow, chipRow, progress);
   if (isFocusItem(item)) body.append(makeFocusPill(item));
-  body.append(actions);
   panel.append(band, body);
   els.recommendationPanel.append(panel);
   if (els.todayQueueList) {
@@ -3243,14 +3240,17 @@ function renderTodayQueueList(entries, topItemId = "") {
   const notice = makeTodayNotice();
   if (notice) els.todayQueueList.append(notice);
   const groups = [
-    { id: "now", label: "Now" },
-    { id: "next", label: "Next" },
-    { id: "later", label: "Later" },
-    { id: "missed", label: "Missed" },
-    { id: "done", label: "Done" }
+    { id: "next", label: "Next", icon: "N" },
+    { id: "later", label: "Later", icon: "L" },
+    { id: "missed", label: "Missed", icon: "!" },
+    { id: "done", label: "Done", icon: "OK" }
   ];
-  const buckets = Object.fromEntries(groups.map((group) => [group.id, []]));
-  entries.forEach((entry) => buckets[todayQueueGroup(entry, topItemId)].push(entry));
+  const buckets = Object.fromEntries([...groups.map((group) => [group.id, []]), ["now", []]]);
+  entries.forEach((entry) => {
+    const bucket = todayQueueGroup(entry, topItemId);
+    if (bucket === "now") return;
+    buckets[bucket].push(entry);
+  });
 
   let rank = 1;
   groups.forEach((group) => {
@@ -3260,11 +3260,18 @@ function renderTodayQueueList(entries, topItemId = "") {
     section.className = `today-queue-group queue-group-${group.id}`;
     const heading = document.createElement("div");
     heading.className = "today-queue-group-heading";
+    const titleWrap = document.createElement("span");
+    titleWrap.className = "queue-group-title";
+    const icon = document.createElement("span");
+    icon.className = "queue-group-icon";
+    icon.textContent = group.icon;
     const title = document.createElement("strong");
     title.textContent = group.label;
+    titleWrap.append(icon, title);
     const count = document.createElement("span");
+    count.className = "queue-group-count";
     count.textContent = String(bucket.length);
-    heading.append(title, count);
+    heading.append(titleWrap, count);
     const list = document.createElement("div");
     list.className = "today-queue-group-list";
     bucket.forEach((entry) => {
@@ -3348,7 +3355,7 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
     const doingButton = document.createElement("button");
     doingButton.type = "button";
     doingButton.className = "queue-action-button queue-doing-button";
-    doingButton.textContent = item.status === "now" ? "Doing" : "Start";
+    doingButton.textContent = item.status === "now" ? "Doing" : queuePrimaryActionText(item);
     doingButton.disabled = item.status === "now";
     doingButton.setAttribute("aria-label", `Make ${item.title} the Doing item`);
     doingButton.addEventListener("click", () => startDoingItem(item.id));
@@ -3358,6 +3365,16 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
   openButton.append(glyph, copy, meta);
   row.append(openButton, actions);
   return row;
+}
+
+function queuePrimaryActionText(item) {
+  const title = String(item.title || "").toLowerCase();
+  if (item.status === "red") return "Do it";
+  if (/\b(call|phone|doctor|clinic|vet)\b/.test(title)) return "Call";
+  if (/\b(cook|dinner|meal|food|grocery)\b/.test(title)) return "Plan";
+  if (/\b(review|read|check)\b/.test(title) || item.status === "waiting") return "Review";
+  if (isRhythm(item)) return "Start";
+  return "Start";
 }
 
 function makeMiniItem(item) {
