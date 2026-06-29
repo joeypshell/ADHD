@@ -3971,7 +3971,7 @@ body {
 
 .app-shell {
   width: min(430px, 100%);
-  padding: env(safe-area-inset-top) 20px calc(116px + env(safe-area-inset-bottom));
+  padding: env(safe-area-inset-top) 12px calc(116px + env(safe-area-inset-bottom));
 }
 
 .topbar {
@@ -4028,11 +4028,11 @@ body {
 }
 
 .recommendation-shell {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .now-card {
-  padding: 16px;
+  padding: 14px;
   border-color: var(--line);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.88);
@@ -4051,7 +4051,7 @@ body {
 }
 
 .next-band span {
-  font-size: clamp(2.05rem, 9vw, 2.45rem);
+  font-size: clamp(1.9rem, 8.2vw, 2.3rem);
 }
 
 .next-band strong {
@@ -4061,33 +4061,33 @@ body {
 }
 
 .now-task-row {
-  grid-template-columns: minmax(0, 1fr) 108px;
-  gap: 12px;
-  min-height: 104px;
-  padding: 14px 16px;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 10px;
+  min-height: 98px;
+  padding: 12px;
   border-radius: 18px;
 }
 
 .next-main {
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 11px;
   min-height: 72px;
 }
 
 .next-icon {
-  width: 56px;
-  height: 56px;
-  font-size: 1.65rem;
+  width: 48px;
+  height: 48px;
+  font-size: 1.45rem;
 }
 
 .next-icon .ui-icon {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
 }
 
 .now-card h3 {
   font-family: inherit;
-  font-size: clamp(1.45rem, 6.2vw, 1.75rem);
+  font-size: clamp(1.28rem, 5.5vw, 1.58rem);
   font-weight: 900;
   line-height: 1.08;
   -webkit-line-clamp: 2;
@@ -4098,14 +4098,14 @@ body {
   align-items: center;
   gap: 5px;
   color: var(--green);
-  font-size: 0.98rem;
+  font-size: 0.9rem;
   font-weight: 900;
 }
 
 .next-open-hint::before {
   content: "";
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: 2px solid currentColor;
   border-radius: 50%;
 }
@@ -4113,14 +4113,14 @@ body {
 .now-actions .primary-button,
 .now-actions .secondary-button,
 .now-actions .ghost-button {
-  min-height: 58px;
-  padding-inline: 12px;
+  min-height: 54px;
+  padding-inline: 8px;
   border-radius: 999px;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
 }
 
 .today-queue-list {
-  gap: 26px;
+  gap: 24px;
 }
 
 .today-queue-group {
@@ -4155,7 +4155,7 @@ body {
 }
 
 .today-queue-group-heading strong {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
 }
 
 .today-queue-group-heading .queue-group-count {
@@ -4194,28 +4194,28 @@ body {
 
 .today-queue-row {
   grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 84px;
-  padding: 10px 14px;
+  min-height: 78px;
+  padding: 9px 12px;
 }
 
 .queue-open {
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 14px;
-  min-height: 64px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 58px;
 }
 
 .queue-rank {
-  width: 54px;
-  height: 54px;
+  width: 48px;
+  height: 48px;
 }
 
 .queue-rank .ui-icon {
-  width: 29px;
-  height: 29px;
+  width: 25px;
+  height: 25px;
 }
 
 .queue-copy strong {
-  font-size: 1.18rem;
+  font-size: 1.08rem;
   font-weight: 880;
 }
 
@@ -4226,15 +4226,15 @@ body {
 }
 
 .queue-action-button {
-  min-width: 72px;
-  min-height: 42px;
-  padding: 0 13px;
+  min-width: 68px;
+  min-height: 40px;
+  padding: 0 11px;
   border-radius: 10px;
   font-size: 0.92rem;
 }
 
 .focus-anchor {
-  width: min(386px, calc(100% - 40px));
+  width: min(406px, calc(100% - 24px));
   min-height: 74px;
   bottom: calc(84px + env(safe-area-inset-bottom));
   padding: 10px 12px;
@@ -4280,7 +4280,7 @@ body {
 .bottom-nav {
   width: min(430px, 100%);
   min-height: 78px;
-  padding: 9px 18px calc(8px + env(safe-area-inset-bottom));
+  padding: 9px 12px calc(8px + env(safe-area-inset-bottom));
   border-radius: 22px 22px 0 0;
 }
 
@@ -4314,12 +4314,12 @@ body {
 
 @media (max-width: 380px) {
   .app-shell {
-    padding-inline: 16px;
+    padding-inline: 10px;
   }
 
   .now-task-row {
-    grid-template-columns: minmax(0, 1fr) 96px;
-    padding-inline: 12px;
+    grid-template-columns: minmax(0, 1fr) 88px;
+    padding-inline: 10px;
   }
 
   .now-actions .primary-button,
