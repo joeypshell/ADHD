@@ -79,7 +79,8 @@ Implemented in the app:
 - email magic-link login button
 - Google and Apple provider login buttons that call Supabase provider ids
 - logout
-- manual Sync now
+- manual first-sync choice and Sync now fallback
+- automatic sync after a first sync baseline exists
 - one-document `user_state` upload/download
 - first-sync choice dialog
 - simple conflict choice
@@ -113,8 +114,8 @@ MVP behavior:
 - login screen only when sync is enabled
 - localStorage remains the offline cache and source for offline use
 - Supabase stores one user-scoped state document
-- manual "Sync now" first
-- auto-sync only after manual sync proves trustworthy
+- manual "Sync now" still exists for reassurance
+- auto-sync runs after local edits, session restore, tab visibility, online events, and a gentle interval
 - import/export remains available
 - no private API keys in GitHub Pages
 
@@ -216,6 +217,15 @@ Manual sync:
 6. Save successful result to localStorage.
 7. Update last-sync metadata.
 
+Automatic sync:
+
+- does not run before the first sync choice
+- debounces local edits so every checkbox click does not immediately hit Supabase
+- downloads cloud changes when another device changed and this browser did not
+- uploads local changes when this browser changed and the cloud did not
+- opens the conflict choice if both sides changed
+- leaves the manual Sync now button available as an explicit fallback
+
 ## Conflict Handling
 
 Smallest useful version:
@@ -284,6 +294,7 @@ Completed:
 - Wire email magic-link login/logout to Supabase Auth.
 - Add first-login migration dialog.
 - Add manual Sync now with one-document upload/download.
+- Add auto-sync after the first successful manual upload/download baseline.
 - Add simple conflict choice for cloud/local divergence.
 
 Remaining implementation:
@@ -291,5 +302,5 @@ Remaining implementation:
 1. Test against a real Supabase project.
 2. Add stronger visible conflict details before choosing a winner.
 3. Add a signed-in "last cloud change" status line.
-4. Add optional auto-sync after manual sync proves trustworthy.
+4. Watch real cross-device sync behavior and decide whether per-item merge is worth the complexity.
 5. Add a deletion/export account data path.

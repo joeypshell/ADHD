@@ -67,8 +67,9 @@ https://hmkzkbkugpzvzwvjuind.supabase.co/auth/v1/callback
 4. Complete Google sign-in.
 5. Confirm the app returns to `https://joeypshell.github.io/ADHD/`.
 6. Reopen Settings and confirm the sync panel shows Signed in.
-7. Press Sync now.
-8. On first sync, choose Upload this browser or Use cloud copy intentionally.
+7. Press Sync now for the first sync choice.
+8. Choose Upload this browser or Use cloud copy intentionally.
+9. After that first choice, signed-in devices auto-sync after changes and when the app is foregrounded.
 
 ## Common Failures
 

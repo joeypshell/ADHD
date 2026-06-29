@@ -38,11 +38,13 @@ When sync is configured, the Settings sync panel can:
 - send an email magic-link login
 - restore a Supabase Auth session
 - sign out without deleting local task data
-- manually upload or download one user-scoped `user_state` JSON document
+- manually upload or download one user-scoped `user_state` JSON document for the first sync choice
+- auto-sync after local edits once the first sync baseline exists
+- auto-sync when the app opens, the tab becomes visible, the browser comes online, and on a gentle interval
 
 Magic-link sends persist `sync.lastLoginLinkSentAt` and `sync.lastLoginLinkEmail` locally and enforce a short same-email resend cooldown in the UI. If Supabase returns a rate-limit error, the app also records `sync.lastLoginRateLimitedAt` and applies a broader temporary cooldown so repeated taps do not keep hitting Supabase's low default email quota.
 
-Sync is manual. There is no background auto-sync, no per-item merge, and no app-level end-to-end encryption. Supabase row-level security is expected to protect each user's row.
+The first sync is manual so the user chooses whether the browser or cloud copy wins. After that, sync is automatic and still pauses for the existing conflict dialog if both the browser and cloud changed. There is no per-item merge and no app-level end-to-end encryption. Supabase row-level security is expected to protect each user's row.
 
 ## Data Model
 
@@ -257,7 +259,7 @@ This is acceptable for now, but large features should avoid making `renderRecomm
 
 ## Current Limitations
 
-- No automatic cross-device sync.
+- No per-item cross-device merge; conflicts still choose one copy.
 - No per-item cloud merge.
 - No app-level end-to-end encryption for Supabase data.
 - Google/Apple provider setup and custom SMTP remain external Supabase dashboard work.

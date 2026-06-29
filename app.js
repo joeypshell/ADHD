@@ -3,6 +3,8 @@ const LEGACY_STORAGE_KEY = "life-command-center-v1";
 const SUPABASE_JS_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 const MAGIC_LINK_EMAIL_COOLDOWN_MS = 60 * 1000;
 const MAGIC_LINK_RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000;
+const AUTO_SYNC_DEBOUNCE_MS = 2500;
+const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
 const AREAS = [
   "Work",
@@ -375,6 +377,9 @@ let voiceRecognition = null;
 let supabaseClientPromise = null;
 let syncChoiceContext = null;
 let syncCooldownTimerId = 0;
+let syncAutoTimerId = 0;
+let syncInFlight = false;
+let syncQueuedReason = "";
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -1097,6 +1102,7 @@ function saveState(options = {}) {
   if (options.lastSaved) state.lastSaved = options.lastSaved;
   else if (!options.keepLastSaved) state.lastSaved = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (!options.keepLastSaved && !options.skipAutoSync) scheduleAutoSync("local change");
 }
 
 function firstOpenStep(steps) {
@@ -4737,7 +4743,9 @@ function syncStatusInfo() {
       badge: "Signed in",
       tone: "ok",
       status: `Signed in as ${state.sync.userEmail}. Sync stores one private Supabase JSON document.`,
-      copy: state.sync.lastSyncedAt ? `Last synced ${formatDateTime(state.sync.lastSyncedAt)}.` : "No sync has run in this browser yet."
+      copy: state.sync.lastSyncedAt
+        ? `Auto-sync is on after changes. Last synced ${formatDateTime(state.sync.lastSyncedAt)}.`
+        : "Choose Upload this browser or Use cloud copy once, then auto-sync will run after changes."
     };
   }
   return {
@@ -4942,6 +4950,7 @@ async function restoreSyncSession() {
   if (!syncConfigReady()) return;
   try {
     const user = await currentSyncUser();
+    if (user) scheduleAutoSync("session restore", 250);
     if (!user && state.sync?.userEmail) clearSyncSession("ready");
   } catch (error) {
     state.sync = normalizeSyncState({ ...state.sync, lastError: error.message || "Session restore failed." });
@@ -4996,7 +5005,7 @@ async function syncProviderLogin(provider) {
       options: { redirectTo: syncRedirectUrl() }
     });
     if (error) throw error;
-    setSyncFeedback(`Opening ${providerLabel} login. Return here after sign-in, then press Sync now.`, "ok");
+    setSyncFeedback(`Opening ${providerLabel} login. Return here after sign-in. First sync asks which copy to keep, then auto-sync takes over.`, "ok");
   } catch (error) {
     setSyncFeedback(providerLoginErrorMessage(provider, error), "warn");
   }
@@ -5103,6 +5112,30 @@ function hasCloudChangedSinceSync(row) {
   return row.server_updated_at !== state.sync.lastSyncedServerUpdatedAt;
 }
 
+function canAutoSync() {
+  if (!syncConfigReady()) return false;
+  if (!state.sync?.userEmail || !state.sync?.lastSyncedAt) return false;
+  if (els.syncChoiceDialog?.open) return false;
+  return navigator.onLine !== false;
+}
+
+function scheduleAutoSync(reason = "change", delay = AUTO_SYNC_DEBOUNCE_MS) {
+  if (!canAutoSync()) return;
+  if (syncAutoTimerId) clearTimeout(syncAutoTimerId);
+  syncAutoTimerId = window.setTimeout(() => {
+    syncAutoTimerId = 0;
+    syncNow({ silent: true, reason });
+  }, delay);
+}
+
+function bindAutoSyncEvents() {
+  window.addEventListener("online", () => scheduleAutoSync("online", 250));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") scheduleAutoSync("visible", 250);
+  });
+  window.setInterval(() => scheduleAutoSync("interval", 0), AUTO_SYNC_INTERVAL_MS);
+}
+
 function markSyncComplete(serverUpdatedAt, user) {
   const syncedAt = new Date().toISOString();
   state.sync = normalizeSyncState({
@@ -5116,13 +5149,13 @@ function markSyncComplete(serverUpdatedAt, user) {
     status: "signed-in",
     lastError: ""
   });
-  saveState({ lastSaved: syncedAt });
+  saveState({ lastSaved: syncedAt, skipAutoSync: true });
 }
 
-async function uploadLocalToCloud() {
+async function uploadLocalToCloud(options = {}) {
   const user = await currentSyncUser();
   if (!user) {
-    setSyncFeedback("Sync needs login first.", "warn");
+    if (!options.silent) setSyncFeedback("Sync needs login first.", "warn");
     return;
   }
   const client = await getSupabaseClient();
@@ -5144,17 +5177,17 @@ async function uploadLocalToCloud() {
   markSyncComplete(data?.server_updated_at, user);
   if (els.syncChoiceDialog?.open) els.syncChoiceDialog.close();
   render();
-  setSyncFeedback("Uploaded this browser to Supabase.", "ok");
+  if (!options.silent) setSyncFeedback("Uploaded this browser to Supabase.", "ok");
 }
 
-async function downloadCloudToLocal(row) {
+async function downloadCloudToLocal(row, options = {}) {
   const user = await currentSyncUser();
   if (!user) {
-    setSyncFeedback("Sync needs login first.", "warn");
+    if (!options.silent) setSyncFeedback("Sync needs login first.", "warn");
     return;
   }
   if (!row?.state_json) {
-    setSyncFeedback("No cloud copy exists yet. Upload this browser first.", "warn");
+    if (!options.silent) setSyncFeedback("No cloud copy exists yet. Upload this browser first.", "warn");
     return;
   }
   const currentClientId = state.sync?.clientId || createSyncState().clientId;
@@ -5174,24 +5207,34 @@ async function downloadCloudToLocal(row) {
       lastError: ""
     }
   });
-  saveState({ lastSaved: state.sync.lastSyncedAt });
+  saveState({ lastSaved: state.sync.lastSyncedAt, skipAutoSync: true });
   if (els.syncChoiceDialog?.open) els.syncChoiceDialog.close();
   render();
-  setSyncFeedback("Downloaded the Supabase cloud copy into this browser.", "ok");
+  if (!options.silent) setSyncFeedback("Downloaded the Supabase cloud copy into this browser.", "ok");
 }
 
-async function syncNow() {
-  if (!requireSyncReady("Sync now")) return;
+async function syncNow(options = {}) {
+  const silent = options.silent === true;
+  if (syncInFlight) {
+    if (silent) syncQueuedReason = options.reason || "queued";
+    else setSyncFeedback("Sync is already running. Try again in a moment.", "warn");
+    return;
+  }
+  if (silent && !canAutoSync()) return;
+  if (!silent && !requireSyncReady("Sync now")) return;
+  syncInFlight = true;
   try {
     const user = await currentSyncUser();
     if (!user) {
-      setSyncFeedback("Sync now needs login first. Send the login link, open it, then try again.", "warn");
+      if (!silent) setSyncFeedback("Sync now needs login first. Send the login link, open it, then try again.", "warn");
       return;
     }
     const row = await fetchCloudState(user.id);
     if (!state.sync?.lastSyncedAt) {
-      openSyncChoice("first", row);
-      setSyncFeedback(row ? "Choose Upload this browser or Use cloud copy before the first sync." : "No cloud copy found. Upload this browser when you are ready.", "warn");
+      if (!silent) {
+        openSyncChoice("first", row);
+        setSyncFeedback(row ? "Choose Upload this browser or Use cloud copy before the first sync." : "No cloud copy found. Upload this browser when you are ready.", "warn");
+      }
       return;
     }
     const localChanged = hasLocalChangedSinceSync();
@@ -5202,12 +5245,24 @@ async function syncNow() {
       return;
     }
     if (cloudChanged && row) {
-      await downloadCloudToLocal(row);
+      await downloadCloudToLocal(row, { silent });
       return;
     }
-    await uploadLocalToCloud();
+    if (localChanged || !row) {
+      await uploadLocalToCloud({ silent });
+      return;
+    }
+    renderSyncStatus();
+    if (!silent) setSyncFeedback("Already synced.", "ok");
   } catch (error) {
-    setSyncFeedback(`Sync failed: ${error.message || "Supabase could not complete manual sync."}`, "warn");
+    if (!silent) setSyncFeedback(`Sync failed: ${error.message || "Supabase could not complete manual sync."}`, "warn");
+  } finally {
+    syncInFlight = false;
+    if (syncQueuedReason) {
+      const reason = syncQueuedReason;
+      syncQueuedReason = "";
+      scheduleAutoSync(reason);
+    }
   }
 }
 
@@ -5489,6 +5544,7 @@ function render() {
 
 populateFormSelects();
 bindEvents();
+bindAutoSyncEvents();
 render();
 restoreSyncSession();
 

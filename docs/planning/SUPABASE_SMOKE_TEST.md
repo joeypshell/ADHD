@@ -74,6 +74,18 @@ Before testing, complete `docs/planning/APPLE_PROVIDER_SETUP.md`.
 4. Return to browser A and press Sync now.
 5. Confirm the app shows a conflict choice instead of silently overwriting.
 
+## Auto-Sync Check
+
+1. Complete the first sync choice on both phone and computer.
+2. On phone, add or check off a small test item.
+3. Wait a few seconds, then open or foreground the app on computer.
+4. Confirm the change appears without pressing Sync now.
+5. On computer, change the same test item.
+6. Wait a few seconds, then foreground the app on phone.
+7. Confirm the change appears without pressing Sync now.
+8. Put one browser offline, change an item, then return online.
+9. Confirm sync resumes automatically or opens the conflict dialog if both sides changed.
+
 ## Logout
 
 1. Press Log out.
