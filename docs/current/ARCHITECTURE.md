@@ -147,14 +147,14 @@ Today:
 - optional visual timeline: Now / Next / Later / Missed / Done
 - complete Today list with direct Doing, Done, snapshot Undo confirmation, Snooze return confirmation, and same-day row Undo actions
 - item detail cockpit with why-today, context, next visible step, steps, Do/Done/Snooze/Stuck/Edit
-- quick capture with browser voice fill-in and a tiny-start follow-up
+- quick capture with browser voice fill-in, short auto-stop, and a tiny-start follow-up
 
 Doing and timers are intentionally separate. `status: "now"` means the item is being worked on or should stay at the top; a `focusSession` exists only when the user explicitly starts the timer. Today and item detail use explicit snooze destinations: 15 minutes, 1 hour, tonight, or tomorrow.
 
 Add:
 
-- quick capture with generated tiny starts, browser voice fill-in, and an optional clarification follow-up
-- rule-based brain-dump triage with inferred area, time window, cadence, tiny start, and Today/Later/Rhythm save intent
+- quick capture with generated tiny starts, browser voice fill-in, short auto-stop, and an optional clarification follow-up
+- rule-based brain-dump triage with browser voice fill-in, inferred area, time window, cadence, tiny start, and Today/Later/Rhythm save intent
 - grouped templates for recurring life rails and common rescue projects
 - first-run life rail starter for Body, House, Food, Admin, and Work anchors
 - wizard for project, rhythm, or rescue
@@ -255,7 +255,7 @@ This is acceptable for now, but large features should avoid making `renderRecomm
 
 ## Service Worker
 
-`sw.js` caches the static assets. Bump `CACHE_NAME` whenever shipped assets change.
+`sw.js` caches the static assets. Bump `CACHE_NAME` whenever shipped assets change. New service workers call `skipWaiting()` and `clients.claim()` so cache updates take over promptly after deployment.
 
 ## Current Limitations
 

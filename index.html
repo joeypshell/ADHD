@@ -163,7 +163,9 @@
             <h3>Paste it messy. Save only what you want.</h3>
             <label class="sr-only" for="brainDumpInput">Brain dump</label>
             <textarea id="brainDumpInput" rows="6" placeholder="Example: renew sticker, ask clinic about tests, maybe clean kitchen tonight"></textarea>
+            <p class="voice-status brain-voice-status" id="brainVoiceStatus" aria-live="polite"></p>
             <div class="brain-dump-actions">
+              <button class="secondary-button voice-button" type="button" data-voice-target="brain" aria-label="Dictate brain dump">Mic</button>
               <button class="primary-button" id="extractBrainDumpButton" type="button">Find tasks</button>
               <button class="secondary-button" id="clearBrainDumpButton" type="button">Clear</button>
             </div>

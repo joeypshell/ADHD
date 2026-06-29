@@ -5,6 +5,7 @@ const MAGIC_LINK_EMAIL_COOLDOWN_MS = 60 * 1000;
 const MAGIC_LINK_RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000;
 const AUTO_SYNC_DEBOUNCE_MS = 2500;
 const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
+const VOICE_CAPTURE_TIMEOUT_MS = 12 * 1000;
 const APPLE_LOGIN_ENABLED = false;
 const POMODORO_PRESETS = [
   { id: "classic", label: "25 + 5", workMinutes: 25, breakMinutes: 5 },
@@ -391,6 +392,7 @@ let brainDumpCandidates = [];
 let captureFollowupItemId = "";
 let todayNotice = null;
 let voiceRecognition = null;
+let voiceCaptureTimeoutId = 0;
 let supabaseClientPromise = null;
 let syncChoiceContext = null;
 let syncCooldownTimerId = 0;
@@ -424,6 +426,7 @@ const els = {
   addCaptureFollowup: document.querySelector("#addCaptureFollowup"),
   addVoiceStatus: document.querySelector("#addVoiceStatus"),
   brainDumpInput: document.querySelector("#brainDumpInput"),
+  brainVoiceStatus: document.querySelector("#brainVoiceStatus"),
   extractBrainDumpButton: document.querySelector("#extractBrainDumpButton"),
   clearBrainDumpButton: document.querySelector("#clearBrainDumpButton"),
   brainCandidateList: document.querySelector("#brainCandidateList"),
@@ -3896,6 +3899,7 @@ function voiceSupport() {
 
 function voiceTarget(target) {
   if (target === "add") return { input: els.addCaptureInput, status: els.addVoiceStatus };
+  if (target === "brain") return { input: els.brainDumpInput, status: els.brainVoiceStatus, multiline: true };
   return { input: els.quickCaptureInput, status: els.quickVoiceStatus };
 }
 
@@ -3904,9 +3908,38 @@ function setVoiceStatus(target, message) {
   if (status) status.textContent = message || "";
 }
 
+function voicePrompt(target) {
+  if (target === "brain") return "Listening for up to 12 seconds. Review the words before finding tasks.";
+  return "Listening for up to 12 seconds. Review the words before tapping Add.";
+}
+
+function voiceDoneMessage(target) {
+  if (target === "brain") return "Dictation added. Review it, then tap Find tasks.";
+  return "Dictation added. Review it, then tap Add.";
+}
+
+function appendVoiceTranscript(input, transcript, multiline = false) {
+  const current = input.value.trim();
+  input.value = [current, transcript].filter(Boolean).join(multiline ? "\n" : " ");
+}
+
+function clearVoiceCaptureTimeout() {
+  if (!voiceCaptureTimeoutId) return;
+  window.clearTimeout(voiceCaptureTimeoutId);
+  voiceCaptureTimeoutId = 0;
+}
+
+function stopVoiceRecognition(recognition, method = "stop") {
+  try {
+    if (typeof recognition?.[method] === "function") recognition[method]();
+  } catch {
+    // Some browsers throw if the recognition session already ended.
+  }
+}
+
 function startVoiceCapture(target = "quick") {
   const Recognition = voiceSupport();
-  const { input } = voiceTarget(target);
+  const { input, multiline } = voiceTarget(target);
   if (!input) return;
   if (!Recognition) {
     setVoiceStatus(target, "Voice capture is not supported in this browser.");
@@ -3914,7 +3947,8 @@ function startVoiceCapture(target = "quick") {
   }
 
   if (voiceRecognition) {
-    voiceRecognition.stop();
+    clearVoiceCaptureTimeout();
+    stopVoiceRecognition(voiceRecognition, "abort");
     voiceRecognition = null;
   }
 
@@ -3923,34 +3957,81 @@ function startVoiceCapture(target = "quick") {
   recognition.lang = navigator.language || "en-US";
   recognition.interimResults = false;
   recognition.continuous = false;
-  setVoiceStatus(target, "Listening. Review the words before tapping Add.");
+  let heardTranscript = false;
+  setVoiceStatus(target, voicePrompt(target));
 
   recognition.addEventListener("result", (event) => {
+    if (voiceRecognition !== recognition) return;
     const transcript = Array.from(event.results)
       .map((result) => result[0]?.transcript || "")
       .join(" ")
       .trim();
     if (!transcript) return;
-    input.value = [input.value.trim(), transcript].filter(Boolean).join(" ");
+    heardTranscript = true;
+    appendVoiceTranscript(input, transcript, multiline);
     input.focus();
-    setVoiceStatus(target, "Dictation added. Review it, then tap Add.");
+    setVoiceStatus(target, voiceDoneMessage(target));
+    clearVoiceCaptureTimeout();
+    stopVoiceRecognition(recognition);
   });
 
   recognition.addEventListener("error", (event) => {
+    if (voiceRecognition !== recognition) return;
+    clearVoiceCaptureTimeout();
+    if (event.error === "aborted") {
+      if (!heardTranscript) setVoiceStatus(target, "Voice capture paused. Tap Mic to add more.");
+      return;
+    }
     const reason = event.error === "not-allowed" ? "Microphone permission was blocked." : "Voice capture stopped before it heard anything.";
     setVoiceStatus(target, reason);
   });
 
   recognition.addEventListener("end", () => {
-    if (voiceRecognition === recognition) voiceRecognition = null;
+    if (voiceRecognition !== recognition) return;
+    clearVoiceCaptureTimeout();
+    voiceRecognition = null;
   });
 
   try {
     recognition.start();
+    voiceCaptureTimeoutId = window.setTimeout(() => {
+      if (voiceRecognition !== recognition) return;
+      setVoiceStatus(target, "Voice capture paused. Tap Mic to add more.");
+      clearVoiceCaptureTimeout();
+      stopVoiceRecognition(recognition, "abort");
+      if (voiceRecognition === recognition) voiceRecognition = null;
+    }, VOICE_CAPTURE_TIMEOUT_MS);
   } catch {
     setVoiceStatus(target, "Voice capture could not start in this browser.");
+    clearVoiceCaptureTimeout();
     voiceRecognition = null;
   }
+}
+
+function ensureBrainVoiceControls() {
+  if (!els.brainDumpInput) return;
+  const panel = document.querySelector("#brainDumpPanel");
+  const actions = document.querySelector(".brain-dump-actions");
+  if (!panel || !actions) return;
+
+  let status = document.querySelector("#brainVoiceStatus");
+  if (!status) {
+    status = document.createElement("p");
+    status.className = "voice-status brain-voice-status";
+    status.id = "brainVoiceStatus";
+    status.setAttribute("aria-live", "polite");
+    els.brainDumpInput.insertAdjacentElement("afterend", status);
+  }
+  els.brainVoiceStatus = status;
+
+  if (document.querySelector('[data-voice-target="brain"]')) return;
+  const button = document.createElement("button");
+  button.className = "secondary-button voice-button";
+  button.type = "button";
+  button.dataset.voiceTarget = "brain";
+  button.setAttribute("aria-label", "Dictate brain dump");
+  button.textContent = "Mic";
+  actions.insertBefore(button, els.extractBrainDumpButton || actions.firstChild);
 }
 
 function quickCapture(event) {
@@ -4024,20 +4105,20 @@ function inferBrainKind(text) {
   const lower = text.toLowerCase();
   if (/\b(overdue|late|urgent|scary|avoid|avoiding|panic|rescue|red|expired|shutoff|collections?|eviction|deadline|past due|fee|fine)\b/.test(lower)) return "rescue";
   if (/\b(?:renew|fix|handle|deal with|sort out|get)\b.*\b(?:sticker|registration|tax|bill|insurance|ticket)\b/.test(lower)) return "rescue";
-  if (/\b(daily|weekly|monthly|every|each|routine|habit|always|workout|exercise|dishes|laundry|trash|gas|dinner|meds|medicine|refill)\b/.test(lower)) return "rhythm";
+  if (/\b(daily|weekly|monthly|every|each|routine|habit|always|workout|work out|exercise|dishes|laundry|trash|gas|dinner|cook dinner|meds|medicine|refill)\b/.test(lower)) return "rhythm";
   if (/\b(maybe|someday|later|eventually|idea)\b/.test(lower)) return "later";
   return "project";
 }
 
 function inferBrainArea(text, kind) {
   const lower = text.toLowerCase();
-  if (dashboardMode() === "work" || /\b(work|ticket|client|meeting|email|slack|report|deploy|code)\b/.test(lower)) return "Work";
+  if (/\b(workout|work out|exercise|walk|run|gym|body)\b/.test(lower)) return "Body / Exercise";
   if (/\b(doctor|dentist|clinic|medical|meds|medicine|refill|appointment|therapy|adhd|pharmacy|prescription|vet|veterinarian|pet meds)\b/.test(lower)) return "Health / Medical";
+  if (/\b(friend|girlfriend|boyfriend|spouse|wife|husband|family|kids?|children|mom|dad|partner|relationship|birthday|visit|hang out|pick up kids|school pickup|text\s+(?:mom|dad|friend|family|partner|girlfriend|boyfriend))\b/.test(lower)) return "Relationships";
+  if (dashboardMode() === "work" || /\b(work project|work task|ticket|client|meeting|email|slack|report|deploy|code|deck for work|work deck)\b/.test(lower)) return "Work";
   if (/\b(pay|bill|money|bank|tax|fee|fine|invoice)\b/.test(lower)) return "Money";
   if (/\b(write|novel|chapter|draft|story)\b/.test(lower)) return "Writing";
-  if (/\b(workout|exercise|walk|run|gym|body)\b/.test(lower)) return "Body / Exercise";
-  if (kind === "rhythm" || /\b(dishes|laundry|trash|clean|gas|dinner|car|sticker)\b/.test(lower)) return "Home / Admin";
-  if (/\b(friend|family|mom|dad|partner|relationship|birthday|visit|hang out|text\s+(?:mom|dad|friend|family|partner))\b/.test(lower)) return "Relationships";
+  if (kind === "rhythm" || /\b(dishes|laundry|trash|clean|gas|dinner|cook|kitchen|car|sticker|deck|yard|house|home)\b/.test(lower)) return "Home / Admin";
   return "Unsorted";
 }
 
@@ -4160,7 +4241,7 @@ function updateBrainCandidate(id, patch) {
     const next = { ...candidate, ...patch };
     if (patch.kind) {
       const defaults = brainCandidateDefaults(next.title, next.kind);
-      next.area = defaults.area;
+      if (!candidate.area || candidate.area === inferBrainArea(candidate.title, candidate.kind)) next.area = defaults.area;
       next.timeWindow = defaults.timeWindow;
       next.cadence = defaults.cadence;
       next.tiny = defaults.tiny;
@@ -4204,11 +4285,15 @@ function renderBrainDumpCandidates() {
     ].forEach((option) => kind.append(new Option(option.label, option.id, false, option.id === candidate.kind)));
     kind.addEventListener("change", () => updateBrainCandidate(candidate.id, { kind: kind.value }));
 
+    const area = document.createElement("select");
+    area.setAttribute("aria-label", `Area for ${candidate.title}`);
+    AREAS.forEach((option) => area.append(new Option(option, option, false, option === candidate.area)));
+    area.addEventListener("change", () => updateBrainCandidate(candidate.id, { area: area.value }));
+
     const meta = document.createElement("small");
     meta.className = "brain-candidate-meta";
     meta.textContent = [
       brainCandidateIntent(candidate),
-      candidate.area,
       timeWindowMeta(candidate.timeWindow).label,
       candidate.kind === "rhythm" ? cadenceMeta(candidate.cadence).label : ""
     ].filter(Boolean).join(" / ");
@@ -4222,7 +4307,7 @@ function renderBrainDumpCandidates() {
       renderBrainDumpCandidates();
     });
 
-    row.append(keep, title, kind, meta, tiny, remove);
+    row.append(keep, title, kind, area, meta, tiny, remove);
     els.brainCandidateList.append(row);
   });
 }
@@ -5629,6 +5714,7 @@ function bindEvents() {
 
   els.quickCaptureForm.addEventListener("submit", quickCapture);
   els.addCaptureForm.addEventListener("submit", addCapture);
+  ensureBrainVoiceControls();
   document.querySelectorAll("[data-voice-target]").forEach((button) => {
     button.addEventListener("click", () => startVoiceCapture(button.dataset.voiceTarget));
   });
@@ -5636,6 +5722,7 @@ function bindEvents() {
   els.clearBrainDumpButton.addEventListener("click", () => {
     brainDumpCandidates = [];
     els.brainDumpInput.value = "";
+    setVoiceStatus("brain", "");
     renderBrainDumpCandidates();
   });
   els.saveBrainDumpButton.addEventListener("click", saveBrainDumpCandidates);
