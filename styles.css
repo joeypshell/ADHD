@@ -798,13 +798,23 @@ textarea {
 
 .brain-candidate {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1.1fr) minmax(96px, 0.45fr) minmax(0, 1fr) auto;
+  grid-template-columns: 22px minmax(0, 1.1fr) minmax(96px, 0.45fr) minmax(120px, 0.75fr) minmax(0, 1fr) auto;
   gap: 7px;
   align-items: center;
   padding: 9px;
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid var(--line);
   border-radius: 14px;
+}
+
+.brain-candidate-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brain-candidate input[type="checkbox"] {
@@ -1728,8 +1738,8 @@ textarea {
   display: grid;
   align-content: center;
   gap: 2px;
-  min-height: 76px;
-  padding: 10px;
+  min-height: 68px;
+  padding: 9px 10px;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.66);
   border: 1px solid var(--line);
@@ -1739,7 +1749,7 @@ textarea {
 .today-summary-card strong {
   color: var(--teal);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(1.45rem, 6vw, 2rem);
+  font-size: clamp(1.3rem, 5.4vw, 1.85rem);
   line-height: 1;
 }
 
@@ -1787,8 +1797,8 @@ textarea {
   align-content: start;
   flex: 0 0 min(156px, 42vw);
   gap: 6px;
-  min-height: 78px;
-  padding: 8px;
+  min-height: 68px;
+  padding: 7px;
   background: rgba(255, 255, 255, 0.48);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1818,14 +1828,14 @@ textarea {
 }
 
 .timeline-head strong {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   line-height: 1.1;
 }
 
 .timeline-head span {
   display: inline-grid;
-  min-width: 26px;
-  min-height: 26px;
+  min-width: 23px;
+  min-height: 23px;
   place-items: center;
   color: var(--teal);
   background: var(--teal-soft);
@@ -1844,7 +1854,7 @@ textarea {
   grid-template-columns: 20px minmax(0, 1fr);
   gap: 5px;
   align-items: center;
-  min-height: 30px;
+  min-height: 28px;
   padding: 4px;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.74);
@@ -2714,6 +2724,22 @@ dialog::backdrop {
   gap: 10px;
 }
 
+.detail-cockpit {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 8px;
+}
+
+.detail-cockpit .next-detail {
+  min-height: 82px;
+  padding: 11px 12px;
+  border-radius: 14px;
+}
+
+.detail-cockpit .next-detail strong {
+  font-size: 0.98rem;
+}
+
 .detail-steps h3 {
   margin: 0;
   font-size: 1rem;
@@ -2896,6 +2922,10 @@ dialog::backdrop {
     justify-self: start;
   }
 
+  .brain-candidate-meta {
+    white-space: normal;
+  }
+
   .today-timeline {
     display: flex;
   }
@@ -3055,6 +3085,10 @@ dialog::backdrop {
   .next-detail-grid {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .detail-cockpit {
+    grid-template-columns: 1fr;
   }
 
   .next-detail {

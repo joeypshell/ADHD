@@ -156,6 +156,70 @@ const STARTER_TEMPLATES = [
     steps: ["Reset one visible surface", "Take out visible trash", "Put five items away"]
   },
   {
+    id: "laundry",
+    title: "Laundry reset",
+    description: "Keep clothes moving",
+    kind: "rhythm",
+    area: "Home / Admin",
+    mode: "home",
+    cadence: "weekly",
+    timeWindow: "afternoon",
+    estimate: 15,
+    importance: 3,
+    dread: 3,
+    nextAction: "Move one load forward",
+    minimum: "Move one load forward",
+    steps: ["Gather one load", "Start or move the load", "Put away five items"]
+  },
+  {
+    id: "trash",
+    title: "Trash reset",
+    description: "Prevent home pileups",
+    kind: "rhythm",
+    area: "Home / Admin",
+    mode: "home",
+    cadence: "weekly",
+    timeWindow: "evening",
+    estimate: 10,
+    importance: 3,
+    dread: 2,
+    nextAction: "Empty one visible trash can",
+    minimum: "Empty one visible trash can",
+    steps: ["Empty one visible trash can", "Check kitchen trash", "Put bags by the door"]
+  },
+  {
+    id: "meds-admin",
+    title: "Medication/admin check",
+    description: "Catch refills, appointments, forms",
+    kind: "rhythm",
+    area: "Health / Medical",
+    mode: "home",
+    cadence: "weekly",
+    timeWindow: "morning",
+    estimate: 10,
+    importance: 5,
+    dread: 3,
+    nextAction: "Open the health/admin list",
+    minimum: "Open the health/admin list",
+    steps: ["Open the health/admin list", "Check refill or appointment needs", "Send one message if needed"]
+  },
+  {
+    id: "work-closeout",
+    title: "Work closeout",
+    description: "End work with a visible next step",
+    kind: "rhythm",
+    area: "Work",
+    mode: "work",
+    cadence: "daily",
+    timeWindow: "afternoon",
+    estimate: 10,
+    importance: 4,
+    dread: 2,
+    nextAction: "Write tomorrow's first work step",
+    minimum: "Write tomorrow's first work step",
+    steps: ["Check open work items", "Write tomorrow's first step", "Send or save one status update"]
+  },
+  {
     id: "work-task",
     title: "Work task",
     description: "Clarify and start",
@@ -203,8 +267,10 @@ const STARTER_TEMPLATES = [
 
 const LIFE_RAIL_STARTERS = [
   { id: "body", label: "Body", templateIds: ["workout"] },
-  { id: "house", label: "House", templateIds: ["dishes"] },
-  { id: "work", label: "Work", templateIds: ["work-checkin"] }
+  { id: "house", label: "House", templateIds: ["dishes", "laundry", "trash"] },
+  { id: "food", label: "Food", templateIds: ["dinner"] },
+  { id: "admin", label: "Admin", templateIds: ["gas", "meds-admin"] },
+  { id: "work", label: "Work", templateIds: ["work-checkin", "work-closeout"] }
 ];
 
 const DEFAULT_RHYTHMS = [];
@@ -2225,6 +2291,26 @@ function todayCandidateReason(item) {
   return "";
 }
 
+function todayReasonText(item, reason = todayCandidateReason(item)) {
+  const text = String(reason || "").trim();
+  const labels = {
+    "done today": "Done today",
+    "focus running": "Focus running",
+    "doing now": "Doing now",
+    "red zone": "Red zone",
+    "planned today": "Planned today",
+    "captured today": "Captured today",
+    "rhythm overdue": "Rhythm overdue",
+    "rhythm due": "Rhythm due today",
+    overdue: "Overdue",
+    "due today": "Due today",
+    "waiting checkback": "Waiting checkback",
+    "review due": "Review due",
+    "next active": "Next active"
+  };
+  return labels[text] || text.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function isTodayCandidate(item, mode = dashboardMode()) {
   if (!isOpen(item) || isSnoozed(item) || isCompletedToday(item) || !isUserVisibleItem(item) || !itemMatchesMode(item, mode)) return false;
   return Boolean(todayCandidateReason(item));
@@ -2383,6 +2469,22 @@ function makeNextDetail(label, value, variant = "") {
   strong.textContent = value;
   row.append(small, strong);
   return row;
+}
+
+function detailContextText(item) {
+  if (isRhythm(item)) {
+    return [
+      cadenceMeta(item.cadence).label,
+      rhythmDueLabel(item),
+      item.lastDone ? `last ${formatDate(item.lastDone)}` : ""
+    ].filter(Boolean).join(" / ");
+  }
+  const doneSteps = item.steps.filter((step) => step.done).length;
+  return [
+    `${doneSteps} of ${item.steps.length || 1} steps`,
+    item.due ? `due ${formatDate(item.due)}` : "",
+    item.review ? `review ${formatDate(item.review)}` : ""
+  ].filter(Boolean).join(" / ") || statusLabel(item.status);
 }
 
 function nextIconText(item) {
@@ -3035,7 +3137,7 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
 
   const meta = document.createElement("span");
   meta.className = "queue-meta";
-  meta.textContent = [isCurrent ? "Next" : "", entry.reason, formatTimeWindow(item), doneToday ? "" : `${item.estimate} min`].filter(Boolean).join(" / ");
+  meta.textContent = [isCurrent ? "Next" : "", todayReasonText(item, entry.reason), formatTimeWindow(item), doneToday ? "" : `${item.estimate} min`].filter(Boolean).join(" / ");
 
   const actions = document.createElement("div");
   actions.className = "queue-row-actions";
@@ -3687,14 +3789,52 @@ function splitBrainDump(text) {
 
 function inferBrainKind(text) {
   const lower = text.toLowerCase();
-  if (/\b(daily|weekly|monthly|every|each|routine|habit|always)\b/.test(lower)) return "rhythm";
-  if (/\b(overdue|late|urgent|scary|avoid|avoiding|panic|rescue|red)\b/.test(lower)) return "rescue";
+  if (/\b(overdue|late|urgent|scary|avoid|avoiding|panic|rescue|red|expired|fee|fine|doctor|clinic|medical|tax|bill|sticker)\b/.test(lower)) return "rescue";
+  if (/\b(daily|weekly|monthly|every|each|routine|habit|always|workout|exercise|dishes|laundry|trash|gas|dinner|meds|medicine|refill)\b/.test(lower)) return "rhythm";
   if (/\b(maybe|someday|later|eventually|idea)\b/.test(lower)) return "later";
   return "project";
 }
 
+function inferBrainArea(text, kind) {
+  const lower = text.toLowerCase();
+  if (dashboardMode() === "work" || /\b(work|ticket|client|meeting|email|slack|report|deploy|code)\b/.test(lower)) return "Work";
+  if (/\b(doctor|clinic|medical|meds|medicine|refill|appointment|therapy|adhd)\b/.test(lower)) return "Health / Medical";
+  if (/\b(pay|bill|money|bank|tax|fee|fine|invoice)\b/.test(lower)) return "Money";
+  if (/\b(write|novel|chapter|draft|story)\b/.test(lower)) return "Writing";
+  if (/\b(workout|exercise|walk|run|gym|body)\b/.test(lower)) return "Body / Exercise";
+  if (/\b(call|text|friend|family|mom|dad|relationship)\b/.test(lower)) return "Relationships";
+  if (kind === "rhythm" || /\b(dishes|laundry|trash|clean|gas|dinner|car|sticker)\b/.test(lower)) return "Home / Admin";
+  return "Unsorted";
+}
+
+function inferBrainTimeWindow(text) {
+  const lower = text.toLowerCase();
+  if (/\b(morning|wake|breakfast|workout|exercise)\b/.test(lower)) return "morning";
+  if (/\b(lunch|midday|noon)\b/.test(lower)) return "midday";
+  if (/\b(afternoon|after work|dinner|cook|prep)\b/.test(lower)) return "afternoon";
+  if (/\b(evening|tonight|night|trash|dishes)\b/.test(lower)) return "evening";
+  return "anytime";
+}
+
+function inferBrainCadence(text) {
+  const lower = text.toLowerCase();
+  if (/\b(daily|every day|each day|dishes|workout|dinner)\b/.test(lower)) return "daily";
+  if (/\b(every 2|every other)\b/.test(lower)) return "every2";
+  if (/\b(biweekly|every 2 weeks)\b/.test(lower)) return "biweekly";
+  if (/\b(monthly|month)\b/.test(lower)) return "monthly";
+  if (/\b(yearly|annual|sticker)\b/.test(lower)) return "yearly";
+  return "weekly";
+}
+
 function suggestedTinyStart(text, kind) {
   const lower = text.toLowerCase();
+  if (lower.includes("sticker")) return "Find the renewal notice or DMV page";
+  if (lower.includes("doctor") || lower.includes("clinic") || lower.includes("medical")) return "Open the portal or phone number";
+  if (lower.includes("gas")) return "Check fuel level";
+  if (lower.includes("dishes")) return "Clear one sink or counter";
+  if (lower.includes("laundry")) return "Move one load forward";
+  if (lower.includes("dinner")) return "Pick one dinner option";
+  if (lower.includes("trash")) return "Empty one visible trash can";
   if (kind === "rhythm") return `Do the smallest version of ${text}`;
   if (kind === "rescue") return "Open this for 5 minutes";
   if (lower.includes("call")) return "Find the phone number";
@@ -3714,6 +3854,9 @@ function extractBrainDump() {
       selected: true,
       title: text,
       kind,
+      area: inferBrainArea(text, kind),
+      timeWindow: inferBrainTimeWindow(text),
+      cadence: inferBrainCadence(text),
       tiny: suggestedTinyStart(text, kind)
     };
   });
@@ -3764,6 +3907,10 @@ function renderBrainDumpCandidates() {
     ].forEach((option) => kind.append(new Option(option.label, option.id, false, option.id === candidate.kind)));
     kind.addEventListener("change", () => updateBrainCandidate(candidate.id, { kind: kind.value }));
 
+    const meta = document.createElement("small");
+    meta.className = "brain-candidate-meta";
+    meta.textContent = [candidate.area, timeWindowMeta(candidate.timeWindow).label, candidate.kind === "rhythm" ? cadenceMeta(candidate.cadence).label : ""].filter(Boolean).join(" / ");
+
     const tiny = document.createElement("input");
     tiny.value = candidate.tiny;
     tiny.addEventListener("change", () => updateBrainCandidate(candidate.id, { tiny: tiny.value.trim() || candidate.tiny }));
@@ -3773,7 +3920,7 @@ function renderBrainDumpCandidates() {
       renderBrainDumpCandidates();
     });
 
-    row.append(keep, title, kind, tiny, remove);
+    row.append(keep, title, kind, meta, tiny, remove);
     els.brainCandidateList.append(row);
   });
 }
@@ -3788,10 +3935,10 @@ function saveBrainDumpCandidates() {
       kind,
       status,
       mode: dashboardMode(),
-      area: dashboardMode() === "work" ? "Work" : "Unsorted",
-      cadence: kind === "rhythm" ? "weekly" : "",
+      area: candidate.area || inferBrainArea(candidate.title, candidate.kind),
+      cadence: kind === "rhythm" ? candidate.cadence || inferBrainCadence(candidate.title) : "",
       nextDue: kind === "rhythm" ? todayIso() : "",
-      timeWindow: "anytime",
+      timeWindow: candidate.timeWindow || inferBrainTimeWindow(candidate.title),
       nextAction: candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind),
       minimum: kind === "rhythm" ? candidate.tiny.trim() || suggestedTinyStart(candidate.title, candidate.kind) : "",
       consequence: candidate.kind === "rescue" ? "Rescue this before it grows" : "",
@@ -3823,8 +3970,18 @@ function renderDetail(item) {
   summary.className = "detail-summary";
   const reasonRow = document.createElement("div");
   reasonRow.className = "reason-row";
+  const todayReason = todayCandidateReason(item);
+  if (todayReason) reasonRow.append(makeChip(todayReasonText(item, todayReason), "strong"));
   recommendationReason(item).forEach((reason, index) => reasonRow.append(makeChip(reason, index === 0 ? "strong" : "")));
   reasonRow.append(makeChip(`${item.estimate} min`));
+
+  const cockpit = document.createElement("div");
+  cockpit.className = "detail-cockpit";
+  cockpit.append(
+    makeNextDetail("Why today", todayReason ? todayReasonText(item, todayReason) : recommendationWhyText(item), "why"),
+    makeNextDetail(isRhythm(item) ? "Rhythm" : "Project", detailContextText(item), "time"),
+    makeNextDetail("Next visible step", currentTinyStep(item), "tiny")
+  );
 
   const tiny = document.createElement("div");
   tiny.className = "tiny-start";
@@ -3856,12 +4013,12 @@ function renderDetail(item) {
       row.append(key, text);
       ladder.append(row);
     });
-    summary.append(reasonRow);
+    summary.append(reasonRow, cockpit);
     if (ladder.childElementCount) summary.append(ladder);
     else summary.append(tiny);
     summary.append(progress);
   } else {
-    summary.append(reasonRow, tiny, progress);
+    summary.append(reasonRow, cockpit, progress);
   }
   if (isFocusItem(item)) summary.append(makeFocusPill(item));
 

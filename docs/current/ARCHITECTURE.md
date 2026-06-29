@@ -144,6 +144,7 @@ Today:
 - compact summary strip for remaining / now / missed-or-later / done
 - compact visual timeline: Now / Next / Later / Missed / Done
 - complete Today list with direct Doing, Done, and same-day Undo actions
+- item detail cockpit with why-today, context, next visible step, steps, Do/Done/Snooze/Stuck/Edit
 - quick capture with browser voice fill-in and a tiny-start follow-up
 
 Doing and timers are intentionally separate. `status: "now"` means the item is being worked on or should stay at the top; a `focusSession` exists only when the user explicitly starts the timer. Today and item detail use explicit snooze destinations: 15 minutes, 1 hour, tonight, or tomorrow.
@@ -151,9 +152,9 @@ Doing and timers are intentionally separate. `status: "now"` means the item is b
 Add:
 
 - quick capture with generated tiny starts, browser voice fill-in, and an optional clarification follow-up
-- rule-based brain-dump triage
-- templates
-- first-run life rail starter for Body, House, and Work anchors
+- rule-based brain-dump triage with inferred area, time window, cadence, and tiny start
+- templates for recurring life rails and common rescue projects
+- first-run life rail starter for Body, House, Food, Admin, and Work anchors
 - wizard for project, rhythm, or rescue
 
 Lists:
