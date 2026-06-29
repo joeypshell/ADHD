@@ -4752,7 +4752,7 @@ function syncStatusInfo() {
   return {
     badge: "Ready",
     tone: "ok",
-    status: "Supabase public config is present. Google login can work after the Google provider is enabled in Supabase.",
+    status: "Cloud sync is ready.",
     copy: "First login will ask whether to upload this browser, use the cloud copy, or stay local."
   };
 }
@@ -4854,7 +4854,7 @@ function renderSyncStatus() {
     els.syncAppleButton.hidden = Boolean(state.sync?.userEmail);
     els.syncAppleButton.disabled = !APPLE_LOGIN_ENABLED;
     els.syncAppleButton.textContent = APPLE_LOGIN_ENABLED ? "Continue with Apple" : "Apple coming soon";
-    els.syncAppleButton.title = APPLE_LOGIN_ENABLED ? "" : "Apple sign-in is parked for later.";
+    els.syncAppleButton.title = APPLE_LOGIN_ENABLED ? "" : "Apple sign-in is coming soon.";
   }
   if (els.syncNowButton) els.syncNowButton.disabled = false;
   if (els.syncLogoutButton) {
@@ -5033,7 +5033,7 @@ function providerLoginErrorMessage(provider, error) {
     || lower.includes("invalid")
     || lower.includes("oauth")
   )) {
-    return "Apple login is not ready in Supabase yet. Enable the Apple provider with the Services ID, Team ID, Key ID, .p8 key, generated client secret, and the Supabase callback URL.";
+    return "Apple sign-in is not available yet. Use Google for sync right now.";
   }
   if (provider === "google" && (
     lower.includes("provider")
@@ -5043,7 +5043,7 @@ function providerLoginErrorMessage(provider, error) {
     || lower.includes("oauth")
     || lower.includes("redirect")
   )) {
-    return "Google login is not ready in Supabase yet. Enable the Google provider with a Web OAuth Client ID, Client Secret, and the Supabase callback URL as an authorized redirect URI.";
+    return "Google sign-in is not available right now. Try again in a bit, or use Sync now if you are already signed in.";
   }
   return `${providerLabel} login failed: ${raw}`;
 }

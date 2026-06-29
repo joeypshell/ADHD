@@ -1242,18 +1242,6 @@ textarea {
   opacity: 0.72;
 }
 
-.sync-provider-note {
-  padding: 10px 12px;
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1.35;
-  margin: 0;
-}
-
 .sync-email-row {
   display: grid;
   gap: 6px;
