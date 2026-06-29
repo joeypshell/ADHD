@@ -2667,6 +2667,65 @@ function makeChip(text, variant = "") {
   return chip;
 }
 
+const ICON_PATHS = {
+  add: ["M12 5v14", "M5 12h14"],
+  briefcase: ["M9 7V5h6v2", "M4 7h16v12H4z", "M4 12h16"],
+  calendar: ["M7 3v4", "M17 3v4", "M4 8h16", "M5 5h14v16H5z"],
+  car: ["M6 16h12", "M7 16l1.6-5h6.8L17 16", "M8 16v2", "M16 16v2", "M7 11l2-3h6l2 3"],
+  chevron: ["M6 9l6 6 6-6"],
+  check: ["M5 12l4 4L19 6"],
+  clock: ["M12 6v6l4 2", "M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"],
+  dumbbell: ["M6 7v10", "M18 7v10", "M3 9v6", "M21 9v6", "M6 12h12"],
+  hammer: ["M14 4l6 6", "M12 6l6 6", "M5 19l8-8", "M4 20l2-2"],
+  home: ["M3 11l9-8 9 8", "M5 10v10h14V10", "M9 20v-6h6v6"],
+  hourglass: ["M6 3h12", "M6 21h12", "M8 3v4a5 5 0 0 0 2 4l2 1 2-1a5 5 0 0 0 2-4V3", "M8 21v-4a5 5 0 0 1 2-4l2-1 2 1a5 5 0 0 1 2 4v4"],
+  list: ["M8 6h12", "M8 12h12", "M8 18h12", "M4 6h.01", "M4 12h.01", "M4 18h.01"],
+  map: ["M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z", "M9 4v14", "M15 6v14"],
+  medical: ["M12 5v14", "M5 12h14"],
+  money: ["M12 3v18", "M17 7c-2-2-8-2-8 1 0 4 8 2 8 6 0 4-6 4-10 1"],
+  pause: ["M8 5v14", "M16 5v14"],
+  pot: ["M6 11h12v7H6z", "M8 11V8h8v3", "M5 14H3", "M21 14h-2"],
+  review: ["M6 7h12", "M6 12h12", "M6 17h8"],
+  stethoscope: ["M6 4v5a4 4 0 0 0 8 0V4", "M14 9v4a4 4 0 0 0 8 0v-1", "M22 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0"],
+  sun: ["M12 4v2", "M12 18v2", "M4 12h2", "M18 12h2", "M6.3 6.3l1.4 1.4", "M16.3 16.3l1.4 1.4", "M17.7 6.3l-1.4 1.4", "M7.7 16.3l-1.4 1.4", "M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0"],
+  toothbrush: ["M7 4h10", "M7 7h10", "M9 10h6", "M13 10l-7 10", "M4 20l3-3"],
+  writing: ["M4 20l4-1 10-10-3-3L5 16z", "M14 6l3 3"],
+  other: ["M12 7v.01", "M12 12v.01", "M12 17v.01"]
+};
+
+function makeIcon(name, className = "ui-icon") {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", className);
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  (ICON_PATHS[name] || ICON_PATHS.other).forEach((data) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", data);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    path.setAttribute("stroke-width", "2");
+    svg.append(path);
+  });
+  return svg;
+}
+
+function hydrateStaticIcons() {
+  if (els.backupToolsButton && !els.backupToolsButton.querySelector(".ui-icon")) {
+    els.backupToolsButton.replaceChildren(makeIcon("sun"));
+  }
+  document.querySelectorAll(".mode-button").forEach((button) => {
+    if (!button.querySelector(".ui-icon")) button.prepend(makeIcon(button.dataset.modeOption === "work" ? "briefcase" : "home"));
+  });
+  document.querySelectorAll(".nav-button").forEach((button) => {
+    if (button.querySelector(".ui-icon")) return;
+    const icon = { now: "calendar", wizard: "add", map: "map", review: "review" }[button.dataset.view] || "other";
+    button.prepend(makeIcon(icon));
+  });
+}
+
 function itemTone(item) {
   if (item.status === "red") return "red";
   if (item.status === "waiting") return "waiting";
@@ -2831,6 +2890,22 @@ function makeTimelineItem(entry) {
   return button;
 }
 
+function itemIconName(item) {
+  const title = String(item.title || "").toLowerCase();
+  if (item.status === "red" && /\b(sticker|car|vehicle|dmv|license|registration)\b/.test(title)) return "car";
+  if (/\b(sticker|car|vehicle|dmv|license|registration|gas)\b/.test(title)) return "car";
+  if (/\b(doctor|clinic|medical|health|medicine|appointment|vet)\b/.test(title) || item.area === "Health / Medical") return "stethoscope";
+  if (/\b(work out|workout|exercise|lift|run|gym)\b/.test(title) || item.area === "Body / Exercise") return "dumbbell";
+  if (/\b(dinner|cook|meal|food|grocery)\b/.test(title)) return "pot";
+  if (/\b(brush|teeth|tooth)\b/.test(title)) return "toothbrush";
+  if (/\b(deck|build|fix|repair|clean|yard|mow)\b/.test(title) || item.area === "Home / Admin") return "hammer";
+  if (item.area === "Money") return "money";
+  if (item.area === "Writing") return "writing";
+  if (item.mode === "work" || item.area === "Work") return "briefcase";
+  if (isRhythm(item)) return "clock";
+  return "home";
+}
+
 function queueChipText(item, reason = "") {
   if (isCompletedToday(item)) return "Done";
   if (item.status === "red") return "Urgent";
@@ -2890,6 +2965,10 @@ function renderFocusAnchor() {
   main.className = "focus-anchor-main";
   main.addEventListener("click", openFocusDialog);
 
+  const icon = document.createElement("span");
+  icon.className = "focus-anchor-icon";
+  icon.append(makeIcon(remaining <= 0 ? "check" : session.running ? "pause" : "clock"));
+
   const label = document.createElement("span");
   label.className = "focus-anchor-label";
   label.textContent = session.running ? "Doing now" : remaining <= 0 ? "Time up" : "Paused";
@@ -2898,7 +2977,7 @@ function renderFocusAnchor() {
   const step = document.createElement("span");
   step.className = "focus-anchor-step";
   step.textContent = currentTinyStep(item);
-  main.append(label, title, step);
+  main.append(icon, label, title, step);
 
   const time = document.createElement("button");
   time.type = "button";
@@ -3102,6 +3181,7 @@ function clearCheckin() {
 }
 
 function renderRecommendation() {
+  hydrateStaticIcons();
   const todayEntries = todayCandidateEntries();
   const dashboardEntries = todayDashboardEntries();
   const entries = todayEntries.length ? todayEntries : fallbackTodayEntries(1);
@@ -3177,7 +3257,7 @@ function renderRecommendation() {
   main.addEventListener("click", () => openDetail(item.id));
   const icon = document.createElement("span");
   icon.className = "next-icon";
-  icon.textContent = nextIconText(item);
+  icon.append(makeIcon(itemIconName(item)));
   const titleWrap = document.createElement("span");
   titleWrap.className = "next-title-wrap";
   const meta = document.createElement("span");
@@ -3240,10 +3320,10 @@ function renderTodayQueueList(entries, topItemId = "") {
   const notice = makeTodayNotice();
   if (notice) els.todayQueueList.append(notice);
   const groups = [
-    { id: "next", label: "Next", icon: "N" },
-    { id: "later", label: "Later", icon: "L" },
-    { id: "missed", label: "Missed", icon: "!" },
-    { id: "done", label: "Done", icon: "OK" }
+    { id: "next", label: "Next", icon: "hourglass" },
+    { id: "later", label: "Later", icon: "calendar" },
+    { id: "missed", label: "Missed", icon: "clock" },
+    { id: "done", label: "Done", icon: "check" }
   ];
   const buckets = Object.fromEntries([...groups.map((group) => [group.id, []]), ["now", []]]);
   entries.forEach((entry) => {
@@ -3264,14 +3344,20 @@ function renderTodayQueueList(entries, topItemId = "") {
     titleWrap.className = "queue-group-title";
     const icon = document.createElement("span");
     icon.className = "queue-group-icon";
-    icon.textContent = group.icon;
+    icon.append(makeIcon(group.icon));
     const title = document.createElement("strong");
     title.textContent = group.label;
     titleWrap.append(icon, title);
     const count = document.createElement("span");
     count.className = "queue-group-count";
     count.textContent = String(bucket.length);
-    heading.append(titleWrap, count);
+    const right = document.createElement("span");
+    right.className = "queue-group-right";
+    const chevron = document.createElement("span");
+    chevron.className = "queue-group-chevron";
+    chevron.append(makeIcon("chevron"));
+    right.append(count, chevron);
+    heading.append(titleWrap, right);
     const list = document.createElement("div");
     list.className = "today-queue-group-list";
     bucket.forEach((entry) => {
@@ -3326,7 +3412,7 @@ function makeTodayQueueRow(entry, index, isCurrent = false) {
 
   const glyph = document.createElement("span");
   glyph.className = "queue-rank";
-  glyph.textContent = doneToday ? "OK" : itemGlyph(item);
+  glyph.append(makeIcon(doneToday ? "check" : itemIconName(item)));
 
   const copy = document.createElement("span");
   copy.className = "queue-copy";

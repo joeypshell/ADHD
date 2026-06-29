@@ -3954,3 +3954,386 @@ body {
     min-width: 64px;
   }
 }
+
+/* Today target: match the mobile mockup structure and density. */
+.ui-icon {
+  display: block;
+  width: 1.25em;
+  height: 1.25em;
+  stroke-width: 2;
+}
+
+#nowView > .quick-capture,
+#nowView > .voice-status,
+#nowView > .capture-followup {
+  display: none;
+}
+
+.app-shell {
+  width: min(430px, 100%);
+  padding: env(safe-area-inset-top) 20px calc(116px + env(safe-area-inset-bottom));
+}
+
+.topbar {
+  max-width: none;
+  padding: 24px 0 16px;
+}
+
+.topbar h1 {
+  font-size: clamp(3rem, 13vw, 3.8rem);
+  line-height: 0.95;
+}
+
+.icon-button {
+  width: 48px;
+  min-height: 48px;
+  border-radius: 14px;
+}
+
+.icon-button .ui-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.today-toolbar {
+  max-width: none;
+  margin-bottom: 24px;
+}
+
+.mode-switch {
+  width: 100%;
+  padding: 3px;
+  border-radius: 11px;
+}
+
+.mode-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 1.05rem;
+}
+
+.mode-button .ui-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.recommendation-shell,
+.today-queue-shell {
+  width: 100%;
+}
+
+.recommendation-shell {
+  margin-bottom: 28px;
+}
+
+.now-card {
+  padding: 16px;
+  border-color: var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 12px 28px rgba(19, 36, 34, 0.1);
+}
+
+.now-card.status-red,
+.now-card.status-waiting,
+.now-card.is-doing {
+  border-color: var(--line);
+}
+
+.next-band {
+  min-height: 34px;
+  padding-bottom: 12px;
+}
+
+.next-band span {
+  font-size: clamp(2.05rem, 9vw, 2.45rem);
+}
+
+.next-band strong {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.now-task-row {
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 12px;
+  min-height: 104px;
+  padding: 14px 16px;
+  border-radius: 18px;
+}
+
+.next-main {
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 72px;
+}
+
+.next-icon {
+  width: 56px;
+  height: 56px;
+  font-size: 1.65rem;
+}
+
+.next-icon .ui-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.now-card h3 {
+  font-family: inherit;
+  font-size: clamp(1.45rem, 6.2vw, 1.75rem);
+  font-weight: 900;
+  line-height: 1.08;
+  -webkit-line-clamp: 2;
+}
+
+.next-open-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--green);
+  font-size: 0.98rem;
+  font-weight: 900;
+}
+
+.next-open-hint::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.now-actions .primary-button,
+.now-actions .secondary-button,
+.now-actions .ghost-button {
+  min-height: 58px;
+  padding-inline: 12px;
+  border-radius: 999px;
+  font-size: 1.2rem;
+}
+
+.today-queue-list {
+  gap: 26px;
+}
+
+.today-queue-group {
+  gap: 10px;
+}
+
+.today-queue-group-heading {
+  padding: 0 10px 0 8px;
+}
+
+.today-queue-group-heading .queue-group-title {
+  gap: 10px;
+}
+
+.today-queue-group-heading .queue-group-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--teal);
+}
+
+.queue-group-later .queue-group-icon {
+  color: var(--gold);
+}
+
+.queue-group-missed .queue-group-icon {
+  color: #bf4251;
+}
+
+.today-queue-group-heading .queue-group-icon .ui-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.today-queue-group-heading strong {
+  font-size: 1.35rem;
+}
+
+.today-queue-group-heading .queue-group-count {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 0.92rem;
+}
+
+.today-queue-group-heading .queue-group-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  height: auto;
+  color: inherit;
+  background: transparent;
+}
+
+.queue-group-chevron {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: #8a9596;
+}
+
+.queue-group-chevron .ui-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.today-queue-group-list {
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(19, 36, 34, 0.08);
+}
+
+.today-queue-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 84px;
+  padding: 10px 14px;
+}
+
+.queue-open {
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 64px;
+}
+
+.queue-rank {
+  width: 54px;
+  height: 54px;
+}
+
+.queue-rank .ui-icon {
+  width: 29px;
+  height: 29px;
+}
+
+.queue-copy strong {
+  font-size: 1.18rem;
+  font-weight: 880;
+}
+
+.queue-meta .calm-chip {
+  min-height: 24px;
+  padding-inline: 9px;
+  font-size: 0.73rem;
+}
+
+.queue-action-button {
+  min-width: 72px;
+  min-height: 42px;
+  padding: 0 13px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+}
+
+.focus-anchor {
+  width: min(386px, calc(100% - 40px));
+  min-height: 74px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  padding: 10px 12px;
+  border-radius: 20px;
+}
+
+.focus-anchor-main {
+  grid-template-columns: 48px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+}
+
+.focus-anchor-icon {
+  grid-row: 1 / span 3;
+  display: inline-grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+}
+
+.focus-anchor-icon .ui-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.focus-anchor-label {
+  font-size: 0.72rem;
+}
+
+.focus-anchor-main strong {
+  font-size: 1.45rem;
+}
+
+.focus-anchor-time {
+  min-width: 72px;
+  min-height: 54px;
+  font-size: 1rem;
+}
+
+.bottom-nav {
+  width: min(430px, 100%);
+  min-height: 78px;
+  padding: 9px 18px calc(8px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0;
+}
+
+.nav-button::before {
+  content: none;
+}
+
+.nav-button {
+  min-height: 58px;
+  gap: 3px;
+  font-size: 0.84rem;
+}
+
+.nav-button .ui-icon {
+  justify-self: center;
+  width: 28px;
+  height: 28px;
+}
+
+.nav-button.is-active::after {
+  width: 28px;
+  height: 4px;
+}
+
+@media (min-width: 861px) {
+  .app-shell,
+  .bottom-nav {
+    width: min(430px, 100%);
+  }
+}
+
+@media (max-width: 380px) {
+  .app-shell {
+    padding-inline: 16px;
+  }
+
+  .now-task-row {
+    grid-template-columns: minmax(0, 1fr) 96px;
+    padding-inline: 12px;
+  }
+
+  .now-actions .primary-button,
+  .now-actions .secondary-button,
+  .now-actions .ghost-button {
+    font-size: 1.05rem;
+  }
+
+  .queue-open {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .queue-rank {
+    width: 48px;
+    height: 48px;
+  }
+}
