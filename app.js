@@ -4743,7 +4743,7 @@ function syncStatusInfo() {
   return {
     badge: "Ready",
     tone: "ok",
-    status: "Supabase public config is present. Apple login can work after the Apple provider is enabled in Supabase.",
+    status: "Supabase public config is present. Google login can work after the Google provider is enabled in Supabase.",
     copy: "First login will ask whether to upload this browser, use the cloud copy, or stay local."
   };
 }
@@ -5014,6 +5014,16 @@ function providerLoginErrorMessage(provider, error) {
     || lower.includes("oauth")
   )) {
     return "Apple login is not ready in Supabase yet. Enable the Apple provider with the Services ID, Team ID, Key ID, .p8 key, generated client secret, and the Supabase callback URL.";
+  }
+  if (provider === "google" && (
+    lower.includes("provider")
+    || lower.includes("disabled")
+    || lower.includes("unsupported")
+    || lower.includes("invalid")
+    || lower.includes("oauth")
+    || lower.includes("redirect")
+  )) {
+    return "Google login is not ready in Supabase yet. Enable the Google provider with a Web OAuth Client ID, Client Secret, and the Supabase callback URL as an authorized redirect URI.";
   }
   return `${providerLabel} login failed: ${raw}`;
 }

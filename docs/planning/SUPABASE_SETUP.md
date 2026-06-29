@@ -41,12 +41,16 @@ Google and Apple login are optional Supabase Auth providers. Their provider clie
 
 ### Google
 
+Use `docs/planning/GOOGLE_PROVIDER_SETUP.md` as the working checklist.
+
 1. Create or use a Google Cloud project.
 2. Configure the OAuth consent screen.
-3. Create a Web OAuth client.
-4. Add the callback URL shown in Supabase Auth provider settings to the Google OAuth client.
-5. Paste the Google client ID and client secret into Supabase Auth -> Providers -> Google.
-6. Enable the Google provider in Supabase.
+3. Add `joeypshell.github.io` as an authorized domain if Google asks for one.
+4. If the app is in Testing mode, add the Google account you will use as a test user.
+5. Create a Web OAuth client.
+6. Add the Supabase callback URL to the Google OAuth client's authorized redirect URIs. The callback is usually `https://<project-ref>.supabase.co/auth/v1/callback`.
+7. Paste the Google client ID and client secret into Supabase Auth -> Providers -> Google.
+8. Enable the Google provider in Supabase.
 
 The app starts this flow with Supabase provider id `google`.
 

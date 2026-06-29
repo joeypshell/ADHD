@@ -36,10 +36,15 @@ Run these checks after:
 
 ## Google
 
+Before testing, complete `docs/planning/GOOGLE_PROVIDER_SETUP.md`.
+
 1. Press Continue with Google.
 2. Complete the provider login.
-3. Confirm Settings shows Signed in.
-4. Press Sync now and verify the same first-sync choices.
+3. Confirm the browser returns to the configured app redirect URL.
+4. Confirm Settings shows Signed in.
+5. Press Sync now and verify the same first-sync choices.
+6. If Google fails before showing the Google login screen, re-check the Supabase Google provider is enabled.
+7. If Google signs in but does not return to the app, re-check the Google OAuth authorized redirect URI and Supabase redirect allow list.
 
 ## Apple
 

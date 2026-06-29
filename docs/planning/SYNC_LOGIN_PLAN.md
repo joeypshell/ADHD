@@ -95,10 +95,10 @@ Known setup blockers:
 
 Next auth decision:
 
-1. Enable Apple first because it is the current provider target.
+1. Enable Google first because it avoids the paid Apple Developer dependency.
 2. Keep email magic link as fallback, but add custom SMTP before serious repeated testing.
-3. Add Google after Apple if another provider is still useful.
-4. Re-run the Apple smoke test in `docs/planning/SUPABASE_SMOKE_TEST.md`.
+3. Add Apple later if another provider is still useful and Apple Developer access is available.
+4. Re-run the Google smoke test in `docs/planning/SUPABASE_SMOKE_TEST.md`.
 
 Why one JSON document first:
 
