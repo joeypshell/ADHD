@@ -8,7 +8,8 @@ const functionNames = [
   "splitBrainDumpSegment",
   "splitBrainDump",
   "inferBrainKind",
-  "inferBrainArea"
+  "inferBrainArea",
+  "inferBrainCadence"
 ];
 
 function extractFunction(name) {
@@ -29,7 +30,7 @@ function extractFunction(name) {
 const context = {};
 vm.createContext(context);
 vm.runInContext(
-  `function dashboardMode() { return "home"; }\n${functionNames.map(extractFunction).join("\n")}\nthis.splitBrainDump = splitBrainDump;\nthis.inferBrainKind = inferBrainKind;\nthis.inferBrainArea = inferBrainArea;`,
+  `function dashboardMode() { return "home"; }\n${functionNames.map(extractFunction).join("\n")}\nthis.splitBrainDump = splitBrainDump;\nthis.inferBrainKind = inferBrainKind;\nthis.inferBrainArea = inferBrainArea;\nthis.inferBrainCadence = inferBrainCadence;`,
   context
 );
 
@@ -49,6 +50,12 @@ function assertInference(input, expected) {
   }
   if (expected.area && area !== expected.area) {
     throw new Error(`Expected ${JSON.stringify(input)} area ${expected.area}, got ${area}`);
+  }
+  if (expected.cadence) {
+    const cadence = context.inferBrainCadence(input);
+    if (cadence !== expected.cadence) {
+      throw new Error(`Expected ${JSON.stringify(input)} cadence ${expected.cadence}, got ${cadence}`);
+    }
   }
 }
 
@@ -77,5 +84,11 @@ assertInference("call doctor", { kind: "project", area: "Health / Medical" });
 assertInference("call vet", { kind: "project", area: "Health / Medical" });
 assertInference("text mom", { kind: "project", area: "Relationships" });
 assertInference("call client", { kind: "project", area: "Work" });
+assertInference("call girlfriend", { kind: "project", area: "Relationships" });
+assertInference("do work project", { kind: "project", area: "Work" });
+assertInference("build deck", { kind: "project", area: "Home / Admin" });
+assertInference("cook dinner", { kind: "rhythm", area: "Home / Admin" });
+assertInference("pick up kids", { kind: "project", area: "Relationships" });
+assertInference("work out", { kind: "rhythm", area: "Body / Exercise", cadence: "daily" });
 
 console.log("OK: brain dump extraction checks passed");

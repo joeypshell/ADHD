@@ -4133,7 +4133,7 @@ function inferBrainTimeWindow(text) {
 
 function inferBrainCadence(text) {
   const lower = text.toLowerCase();
-  if (/\b(daily|every day|each day|dishes|workout|dinner)\b/.test(lower)) return "daily";
+  if (/\b(daily|every day|each day|dishes|workout|work out|dinner)\b/.test(lower)) return "daily";
   if (/\b(every 2|every other)\b/.test(lower)) return "every2";
   if (/\b(biweekly|every 2 weeks)\b/.test(lower)) return "biweekly";
   if (/\b(monthly|month)\b/.test(lower)) return "monthly";
