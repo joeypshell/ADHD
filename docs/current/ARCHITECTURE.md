@@ -40,6 +40,8 @@ When sync is configured, the Settings sync panel can:
 - sign out without deleting local task data
 - manually upload or download one user-scoped `user_state` JSON document
 
+Magic-link sends persist `sync.lastLoginLinkSentAt` locally and enforce a one-hour resend cooldown in the UI. This keeps repeated taps from burning through Supabase's low default email quota.
+
 Sync is manual. There is no background auto-sync, no per-item merge, and no app-level end-to-end encryption. Supabase row-level security is expected to protect each user's row.
 
 ## Data Model
@@ -170,7 +172,7 @@ Settings / Backup:
 - local export/import
 - rhythm alert permission controls
 - disabled-by-default Supabase sync controls
-- email magic-link login/logout when configured
+- email magic-link login/logout when configured, with a local resend cooldown
 - first-sync choice dialog
 - manual Sync now upload/download
 

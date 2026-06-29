@@ -1,6 +1,7 @@
 const STORAGE_KEY = "life-command-center-v2";
 const LEGACY_STORAGE_KEY = "life-command-center-v1";
 const SUPABASE_JS_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+const MAGIC_LINK_COOLDOWN_MS = 60 * 60 * 1000;
 
 const AREAS = [
   "Work",
@@ -296,6 +297,7 @@ let captureFollowupItemId = "";
 let voiceRecognition = null;
 let supabaseClientPromise = null;
 let syncChoiceContext = null;
+let syncCooldownTimerId = 0;
 
 const els = {
   todayLabel: document.querySelector("#todayLabel"),
@@ -510,6 +512,7 @@ function createSyncState() {
     lastSyncedAt: "",
     lastSyncedServerUpdatedAt: "",
     lastSessionCheckedAt: "",
+    lastLoginLinkSentAt: "",
     userId: "",
     userEmail: "",
     status: "off",
@@ -527,6 +530,7 @@ function normalizeSyncState(sync = {}) {
     lastSyncedAt: sync.lastSyncedAt || "",
     lastSyncedServerUpdatedAt: sync.lastSyncedServerUpdatedAt || "",
     lastSessionCheckedAt: sync.lastSessionCheckedAt || "",
+    lastLoginLinkSentAt: sync.lastLoginLinkSentAt || "",
     userId: sync.userId || "",
     userEmail: sync.userEmail || "",
     status: sync.status || "off",
@@ -4337,6 +4341,51 @@ function syncStatusInfo() {
   };
 }
 
+function loginLinkCooldownRemaining() {
+  const sent = toDate(state.sync?.lastLoginLinkSentAt);
+  if (!sent) return 0;
+  return Math.max(0, MAGIC_LINK_COOLDOWN_MS - (Date.now() - sent.getTime()));
+}
+
+function formatCooldown(ms) {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest ? `${hours}h ${rest}m` : `${hours}h`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function syncLoginCooldownText() {
+  const remaining = loginLinkCooldownRemaining();
+  return remaining ? `Try email again in ${formatCooldown(remaining)}` : "Send login link";
+}
+
+function startLoginLinkCooldown() {
+  const previousLastSaved = state.lastSaved || "";
+  state.sync = normalizeSyncState({
+    ...state.sync,
+    lastLoginLinkSentAt: new Date().toISOString(),
+    lastError: ""
+  });
+  saveState({ lastSaved: previousLastSaved });
+  renderSyncStatus();
+}
+
+function updateSyncCooldownTimer() {
+  const remaining = loginLinkCooldownRemaining();
+  if (!remaining && syncCooldownTimerId) {
+    clearInterval(syncCooldownTimerId);
+    syncCooldownTimerId = 0;
+  }
+  if (remaining && !syncCooldownTimerId) {
+    syncCooldownTimerId = window.setInterval(renderSyncStatus, 1000);
+  }
+}
+
 function renderSyncStatus() {
   const info = syncStatusInfo();
   if (els.syncStatusBadge) {
@@ -4355,7 +4404,8 @@ function renderSyncStatus() {
   }
   if (els.syncLoginButton) {
     els.syncLoginButton.hidden = Boolean(state.sync?.userEmail);
-    els.syncLoginButton.disabled = false;
+    els.syncLoginButton.textContent = syncLoginCooldownText();
+    els.syncLoginButton.disabled = Boolean(loginLinkCooldownRemaining());
   }
   [els.syncGoogleButton, els.syncAppleButton].forEach((button) => {
     if (!button) return;
@@ -4367,6 +4417,7 @@ function renderSyncStatus() {
     els.syncLogoutButton.hidden = !state.sync?.userEmail;
     els.syncLogoutButton.disabled = false;
   }
+  updateSyncCooldownTimer();
 }
 
 function setSyncFeedback(message, tone = "ok") {
@@ -4472,21 +4523,35 @@ async function restoreSyncSession() {
 
 async function syncLogin() {
   if (!requireSyncReady("Login")) return;
+  const cooldown = loginLinkCooldownRemaining();
+  if (cooldown) {
+    setSyncFeedback(`Email login is cooling down. Try again in ${formatCooldown(cooldown)}.`, "warn");
+    renderSyncStatus();
+    return;
+  }
   const email = syncEmailValue();
   if (!email) {
     setSyncFeedback("Enter your email first, then send the login link.", "warn");
     return;
   }
+  els.syncLoginButton.disabled = true;
+  els.syncLoginButton.textContent = "Sending...";
   try {
     const client = await getSupabaseClient();
-    if (!client) return;
+    if (!client) {
+      renderSyncStatus();
+      return;
+    }
     const { error } = await client.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: syncRedirectUrl() }
     });
     if (error) throw error;
-    setSyncFeedback("Login link sent. Open it on this same device/browser, then come back and press Sync now.", "ok");
+    startLoginLinkCooldown();
+    setSyncFeedback("Login link sent. Open it on this same device/browser, then come back and press Sync now. Email resend is cooling down.", "ok");
   } catch (error) {
+    if (String(error.message || "").toLowerCase().includes("rate limit")) startLoginLinkCooldown();
+    else renderSyncStatus();
     setSyncFeedback(`Login failed: ${error.message || "Supabase could not send the link."}`, "warn");
   }
 }
