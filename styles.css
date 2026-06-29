@@ -4355,3 +4355,323 @@ body {
     height: 48px;
   }
 }
+
+/* Focus-first Today refinement. */
+.app-shell {
+  width: min(920px, 100%);
+  padding-inline: clamp(14px, 4vw, 34px);
+}
+
+.topbar {
+  position: relative;
+  display: block;
+  max-width: 860px;
+  padding: 22px 0 26px;
+  text-align: center;
+}
+
+.topbar .eyebrow {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.topbar h1 {
+  font-size: clamp(3.4rem, 9.2vw, 5.8rem);
+  line-height: 0.88;
+}
+
+.topbar-actions {
+  position: absolute;
+  top: 18px;
+  right: 0;
+}
+
+.today-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.32fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: end;
+  max-width: 860px;
+  margin-bottom: 22px;
+}
+
+.today-context {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+
+.today-context h2 {
+  margin: 0;
+  font-size: clamp(1.95rem, 4vw, 2.75rem);
+  line-height: 0.98;
+}
+
+.mode-switch {
+  width: min(230px, 100%);
+  margin: 0;
+  border-radius: 999px;
+}
+
+.mode-button {
+  min-height: 42px;
+  border-radius: 999px;
+}
+
+.recommendation-shell,
+.today-queue-shell {
+  width: min(860px, 100%);
+}
+
+.recommendation-shell {
+  margin-bottom: 26px;
+}
+
+.now-card {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 28px;
+  background: var(--panel);
+  box-shadow: 0 22px 48px rgba(19, 36, 34, 0.12);
+}
+
+.next-band {
+  min-height: 70px;
+  padding: 18px 26px;
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 54%),
+    linear-gradient(90deg, var(--green), var(--teal)) !important;
+}
+
+.next-band span {
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.next-band strong {
+  min-height: 40px;
+  padding: 0 18px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  font-size: 1rem;
+}
+
+.next-band strong::before,
+.next-open-hint::before {
+  content: none;
+}
+
+.next-card-body {
+  gap: 18px;
+  padding: clamp(22px, 4.5vw, 34px);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.now-task-row {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.next-main {
+  grid-template-columns: clamp(70px, 10vw, 86px) minmax(0, 1fr);
+  gap: clamp(18px, 4vw, 28px);
+  min-height: 112px;
+}
+
+.next-icon {
+  width: clamp(70px, 10vw, 86px);
+  height: clamp(70px, 10vw, 86px);
+  color: var(--green);
+  background: color-mix(in srgb, var(--green-soft) 78%, #fff);
+  border-color: color-mix(in srgb, var(--green) 18%, var(--line));
+  box-shadow: 0 16px 34px rgba(7, 141, 99, 0.12);
+}
+
+.item-meta {
+  display: block;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 950;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.now-card h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.7rem, 8vw, 4.2rem);
+  font-weight: 850;
+  line-height: 0.96;
+}
+
+.next-open-hint {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.next-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.28fr 0.82fr;
+  gap: 10px;
+}
+
+.next-detail {
+  min-height: 98px;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+.next-detail strong {
+  font-size: clamp(1.05rem, 2.4vw, 1.28rem);
+}
+
+.next-progress {
+  display: block;
+  height: 8px;
+}
+
+.now-actions {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr;
+  gap: 10px;
+}
+
+.now-actions .primary-button,
+.now-actions .secondary-button,
+.now-actions .ghost-button {
+  min-height: 62px;
+  border-radius: 18px;
+  font-size: 1.08rem;
+}
+
+.snooze-choices {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.snooze-choice-button {
+  min-height: 46px;
+}
+
+.today-queue-shell {
+  margin-top: 8px;
+  margin-bottom: 28px;
+}
+
+.today-queue-shell > .section-heading {
+  display: flex;
+  align-items: end;
+}
+
+.today-queue-shell h2 {
+  margin: 0;
+  font-size: clamp(1.9rem, 5vw, 2.55rem);
+}
+
+.today-summary {
+  display: grid !important;
+}
+
+@media (min-width: 861px) {
+  .app-shell,
+  .bottom-nav {
+    width: min(920px, 100%);
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    width: min(430px, 100%);
+    padding-inline: 14px;
+  }
+
+  .topbar {
+    padding: 16px 0 18px;
+    text-align: left;
+  }
+
+  .topbar h1 {
+    font-size: clamp(2.35rem, 10.5vw, 3rem);
+  }
+
+  .today-toolbar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .today-context {
+    display: none;
+  }
+
+  .mode-switch {
+    width: 100%;
+  }
+
+  .next-band {
+    min-height: 54px;
+    padding: 14px 18px;
+  }
+
+  .next-card-body {
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .next-main {
+    grid-template-columns: 58px minmax(0, 1fr);
+    min-height: 84px;
+  }
+
+  .next-icon {
+    width: 58px;
+    height: 58px;
+  }
+
+  .item-meta {
+    font-size: 0.76rem;
+  }
+
+  .now-card h3 {
+    font-size: clamp(2rem, 10vw, 2.6rem);
+  }
+
+  .next-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .now-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .now-actions .primary-button,
+  .now-actions .secondary-button,
+  .now-actions .ghost-button {
+    min-height: 54px;
+    padding-inline: 8px;
+    font-size: 0.9rem;
+  }
+
+  .snooze-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .today-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bottom-nav {
+    width: min(430px, 100%);
+  }
+}

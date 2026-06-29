@@ -3252,9 +3252,9 @@ function renderRecommendation() {
   const band = document.createElement("div");
   band.className = "next-band";
   const bandLabel = document.createElement("span");
-  bandLabel.textContent = "Now";
+  bandLabel.textContent = isDoing ? "Doing now" : "Best next";
   const bandPill = document.createElement("strong");
-  bandPill.textContent = isDoing ? "Currently active" : "Focus on one thing";
+  bandPill.textContent = isDoing ? "Doing" : "Next";
   if (session) bandPill.dataset.focusRemaining = item.id;
   band.append(bandLabel, bandPill);
 
@@ -3275,21 +3275,25 @@ function renderRecommendation() {
   titleWrap.className = "next-title-wrap";
   const meta = document.createElement("span");
   meta.className = "item-meta";
-  meta.textContent = isDoing ? "Now" : "Recommended";
+  meta.textContent = [
+    isDoing ? "Doing now" : "Recommended",
+    isRhythm(item) ? "Rhythm" : "Project",
+    top.reason ? todayReasonText(item, top.reason) : ""
+  ].filter(Boolean).join(" / ");
   const title = document.createElement("h3");
   title.textContent = item.title;
   const openHint = document.createElement("span");
   openHint.className = "next-open-hint";
-  openHint.textContent = timeChipText(item);
+  openHint.textContent = "Open details";
   titleWrap.append(meta, title, openHint);
   main.append(icon, titleWrap);
 
-  const chipRow = document.createElement("div");
-  chipRow.className = "calm-chip-row";
-  chipRow.append(
-    makeCalmChip(queueChipText(item, top.reason), item.status === "red" ? "urgent" : item.status === "waiting" ? "waiting" : ""),
-    makeCalmChip(timeChipText(item), "time"),
-    makeCalmChip(item.area === "Unsorted" ? "Today" : item.area, "area")
+  const details = document.createElement("div");
+  details.className = "next-detail-grid";
+  details.append(
+    makeNextDetail("Why", recommendationWhyText(item, top.reason), "why"),
+    makeNextDetail(isRhythm(item) ? "Minimum" : "Tiny start", currentTinyStep(item), "tiny"),
+    makeNextDetail("Time", timeChipText(item), "time")
   );
 
   const progress = document.createElement("div");
@@ -3301,14 +3305,17 @@ function renderRecommendation() {
 
   const actions = document.createElement("div");
   actions.className = "now-actions";
-  if (session) {
-    actions.append(createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)));
-  } else {
-    actions.append(createButton("Start", "primary-button action-button", () => openFocusSetup(item.id)));
-  }
+  actions.append(
+    createButton(isRhythm(item) ? "Done today" : "Done step", "primary-button action-button", () => completeTodayAction(item.id)),
+    createButton(session ? "Timer" : "Start timer", "secondary-button action-button", () => {
+      if (session) openFocusDialog();
+      else openFocusSetup(item.id);
+    }),
+    createButton("Details", "secondary-button action-button", () => openDetail(item.id))
+  );
 
-  taskRow.append(main, actions);
-  body.append(taskRow, chipRow, progress);
+  taskRow.append(main);
+  body.append(taskRow, details, progress, actions, makeSnoozeChoices(item.id));
   if (isFocusItem(item)) body.append(makeFocusPill(item));
   panel.append(band, body);
   els.recommendationPanel.append(panel);

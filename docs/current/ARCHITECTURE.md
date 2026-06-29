@@ -142,8 +142,8 @@ Today:
 - mode switch
 - compact optional energy/brain-state check-in
 - sticky focus anchor when a Doing timer is active
-- recommendation card
-- compact summary strip for remaining / now / missed-or-later / done
+- focus-first recommendation card with why, tiny-start, time, timer/detail actions, and snooze controls
+- Today tasks section below the recommendation card, with compact summary strip for remaining / now / missed-or-later / done
 - optional visual timeline: Now / Next / Later / Missed / Done
 - complete Today list with direct Doing, Done, snapshot Undo confirmation, Snooze return confirmation, and same-day row Undo actions
 - item detail cockpit with why-today, context, next visible step, steps, Do/Done/Snooze/Stuck/Edit
