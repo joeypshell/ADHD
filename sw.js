@@ -1,4 +1,4 @@
-const CACHE_NAME = "life-command-center-v58";
+const CACHE_NAME = "life-command-center-v60";
 const ASSETS = [
   "./",
   "./index.html",
